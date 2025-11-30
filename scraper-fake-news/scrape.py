@@ -78,9 +78,6 @@ def is_valid_post_url(url):
     # Filter out common image extensions
     if url.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')):
         return False
-    # Must contain YEAR_FILTER and not end with a file extension (except .html)
-    if YEAR_FILTER not in url:
-        return False
     # Optionally, only allow .html or no extension
     if '.' in url.split('/')[-1] and not url.endswith('.html'):
         return False
@@ -112,29 +109,31 @@ def save_to_db(data):
         except Exception as e:
             print(f"❌ Lỗi ghi DB: {e}")
 
-def get_2025_urls():
-    """Lấy danh sách URL từ Sitemap"""
-    print("⏳ Đang lấy danh sách URL từ Sitemap...")
-    target_urls = []
+def get_post_urls_for_year(year):
+    """Lấy danh sách URL bài viết cho một năm nhất định từ Sitemap."""
+    print(f"⏳ Đang lấy danh sách URL từ Sitemap cho năm: {year} ...")
+    post_urls = set()
     try:
         res = base_scraper.get(SITEMAP_INDEX)
-        if res.status_code != 200: return []
-        
+        if res.status_code != 200:
+            print(f"❌ Không thể truy cập sitemap index: {res.status_code}")
+            return []
         soup_index = BeautifulSoup(res.content, 'xml')
         sitemaps = [sm.text for sm in soup_index.find_all('loc') if 'post-sitemap' in sm.text]
-        
         for sm_url in sitemaps:
             r = base_scraper.get(sm_url)
-            if r.status_code == 200:
-                soup_sm = BeautifulSoup(r.content, 'xml')
-                urls = soup_sm.find_all('loc')
-                for url_tag in urls:
-                    url_text = url_tag.text
-                    if is_valid_post_url(url_text):
-                        target_urls.append(url_text)
+            if r.status_code != 200:
+                print(f"❌ Không thể truy cập sitemap con: {sm_url} ({r.status_code})")
+                continue
+            soup_sm = BeautifulSoup(r.content, 'xml')
+            urls = soup_sm.find_all('loc')
+            for url_tag in urls:
+                url_text = url_tag.text
+                if is_valid_post_url(url_text) and f"/{year}/" in url_text:
+                    post_urls.add(url_text)
     except Exception as e:
         print(f"❌ Lỗi lấy sitemap: {e}")
-    return list(set(target_urls))
+    return list(post_urls)
 
 def scrape_and_save(url):
     """Worker: Tải -> Bóc tách thêm Description/Category -> Lưu"""
@@ -181,7 +180,24 @@ def scrape_and_save(url):
         if not published_date:
             date_tag = soup.find('time', class_='entry-date')
             published_date = date_tag['datetime'] if date_tag and date_tag.has_attr('datetime') else None
-            
+        # --- Filter by published date ---
+        # Accept formats: 'DD/MM/YYYY' or 'YYYY-MM-DD' or None
+        post_date = None
+        if published_date:
+            try:
+                if '/' in published_date:
+                    post_date = datetime.strptime(published_date, '%d/%m/%Y')
+                elif '-' in published_date:
+                    post_date = datetime.strptime(published_date[:10], '%Y-%m-%d')
+            except Exception:
+                post_date = None
+        # Only save if post_date is in range
+        if post_date:
+            start_dt = datetime(args.start_year, args.start_month, 1)
+            end_dt = datetime(args.end_year, args.end_month, 28)
+            if not (start_dt <= post_date <= end_dt):
+                return "Skipped (out of range)"
+        
         # 4. Description (Lấy từ meta tag hoặc đoạn đầu bài viết)
         meta_desc = soup.find('meta', attrs={'name': 'description'})
         if meta_desc:
@@ -222,12 +238,10 @@ def main():
     # 1. Khởi tạo DB
     init_db()
     all_urls = []
-    for year, month in month_ranges:
-        print(f"\n🔎 Đang lấy link cho {year}/{month}...")
-        global YEAR_FILTER
-        YEAR_FILTER = f"/{year}/{month}/"
-        urls = get_2025_urls()
-        print(f"✅ Tìm thấy {len(urls)} bài viết cho {year}/{month}.")
+    for year in range(args.start_year, args.end_year + 1):
+        print(f"\n🔎 Đang lấy link cho năm {year}...")
+        urls = get_post_urls_for_year(year)
+        print(f"✅ Tìm thấy {len(urls)} bài viết cho năm {year}.")
         all_urls.extend(urls)
     all_urls = list(set(all_urls))
     total_urls = len(all_urls)

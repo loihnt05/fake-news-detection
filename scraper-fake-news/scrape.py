@@ -8,7 +8,7 @@ import concurrent.futures
 import threading
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- CẤU HÌNH ---
 def get_args():
@@ -35,7 +35,7 @@ def generate_year_month_range(start_year, start_month, end_year, end_month):
 
 args = get_args()
 month_ranges = generate_year_month_range(args.start_year, args.start_month, args.end_year, args.end_month)
-DB_FILE = f"luatkhoa_{args.start_year}.db"
+DB_FILE = f"luatkhoa.db"
 SITEMAP_INDEX = "https://luatkhoa.com/sitemap_index.xml"
 MAX_WORKERS = 5  # Số luồng chạy song song
 
@@ -114,13 +114,16 @@ def get_post_urls_for_year(year):
     print(f"⏳ Đang lấy danh sách URL từ Sitemap cho năm: {year} ...")
     post_urls = set()
     try:
+        print(f"🔗 Đang truy cập sitemap index: {SITEMAP_INDEX}")
         res = base_scraper.get(SITEMAP_INDEX)
         if res.status_code != 200:
             print(f"❌ Không thể truy cập sitemap index: {res.status_code}")
             return []
         soup_index = BeautifulSoup(res.content, 'xml')
         sitemaps = [sm.text for sm in soup_index.find_all('loc') if 'post-sitemap' in sm.text]
-        for sm_url in sitemaps:
+        print(f"📄 Tìm thấy {len(sitemaps)} sitemap con")
+        for idx, sm_url in enumerate(sitemaps, 1):
+            print(f"  [{idx}/{len(sitemaps)}] Đang xử lý: {sm_url}")
             r = base_scraper.get(sm_url)
             if r.status_code != 200:
                 print(f"❌ Không thể truy cập sitemap con: {sm_url} ({r.status_code})")
@@ -194,7 +197,11 @@ def scrape_and_save(url):
         # Only save if post_date is in range
         if post_date:
             start_dt = datetime(args.start_year, args.start_month, 1)
-            end_dt = datetime(args.end_year, args.end_month, 28)
+            # Use last day of end_month instead of hardcoded 28
+            if args.end_month == 12:
+                end_dt = datetime(args.end_year, 12, 31)
+            else:
+                end_dt = datetime(args.end_year, args.end_month + 1, 1) - timedelta(days=1)
             if not (start_dt <= post_date <= end_dt):
                 return "Skipped (out of range)"
         

@@ -26,20 +26,23 @@ VIETNAMESE_STOPWORDS = {
     "nhiều", "toàn", "bộ", "nhất", "hơn", "chỉ", "vẫn", "cùng", "việc"
 }
 
+# TỪ ĐIỂN ĐỒNG NGHĨA (Sử dụng từ ghép có dấu gạch dưới _ để ViTokenizer xử lý đúng)
+# Đã xóa các từ đơn nguy hiểm như "tăng", "giảm" để tránh lỗi "gia tăng cường"
 VIETNAMESE_SYNONYMS = {
-    "sử dụng": ["dùng", "áp dụng", "vận dụng"],
-    "phát triển": ["mở rộng", "tăng trưởng", "đi lên", "thăng tiến"],
-    "quan trọng": ["thiết yếu", "cốt lõi", "trọng yếu", "cấp thiết"],
-    "thông báo": ["công bố", "tuyên bố", "cho hay", "đưa tin"],
-    "xảy ra": ["diễn ra", "xuất hiện", "bùng phát"],
-    "vấn đề": ["thực trạng", "tình hình", "sự việc"],
-    "hỗ trợ": ["giúp đỡ", "trợ giúp", "tiếp sức"],
-    "người dân": ["bà con", "công chúng", "quần chúng", "nhân dân"],
-    "chính phủ": ["nhà nước", "chính quyền", "cơ quan chức năng"],
-    "tăng": ["nhích lên", "leo thang", "gia tăng"],
-    "giảm": ["sụt giảm", "hạ thấp", "thu hẹp"],
-    "yêu cầu": ["đề nghị", "đòi hỏi", "mong muốn"],
-    "thực hiện": ["triển khai", "tiến hành", "thi hành"]
+    "sử_dụng": ["dùng", "áp_dụng", "vận_dụng"],
+    "phát_triển": ["mở_rộng", "tăng_trưởng", "vươn_lên"],
+    "quan_trọng": ["thiết_yếu", "cốt_lõi", "trọng_yếu", "then_chốt"],
+    "thông_báo": ["công_bố", "tuyên_bố", "cho_hay", "đưa_tin"],
+    "xảy_ra": ["diễn_ra", "xuất_hiện", "bùng_phát"],
+    "vấn_đề": ["thực_trạng", "tình_hình", "sự_việc", "vấn_nạn"],
+    "hỗ_trợ": ["giúp_đỡ", "trợ_giúp", "tiếp_sức"],
+    "người_dân": ["bà_con", "công_chúng", "quần_chúng", "nhân_dân"],
+    "chính_phủ": ["nhà_nước", "chính_quyền", "cơ_quan_chức_năng"],
+    "tăng_cường": ["đẩy_mạnh", "gia_tăng", "củng_cố", "thắt_chặt"], # Sửa lỗi "gia tăng cường"
+    "cải_thiện": ["nâng_cao", "hoàn_thiện", "tốt_hơn"],
+    "yêu_cầu": ["đề_nghị", "đòi_hỏi", "mong_muốn"],
+    "thực_hiện": ["triển_khai", "tiến_hành", "thi_hành"],
+    "liên_tục": ["thường_xuyên", "liên_tiếp", "dồn_dập"]
 }
 
 # --- FAKE URL GENERATOR ---
@@ -113,7 +116,6 @@ class FakeURLGenerator:
 # --- PART 2: SALIENCY AND DISINFORMATION GENERATION ---
 
 def get_most_impactful_sentence(text: str) -> str:
-    """Extracts the SINGLE most salient (impactful) sentence from the text."""
     sentences = nltk.sent_tokenize(text)
     valid_sentences = [s for s in sentences if len(s.split()) > 5]
     
@@ -138,50 +140,54 @@ def get_most_impactful_sentence(text: str) -> str:
 
 def alter_numbers(text: str) -> str:
     """
-    Finds numbers in the text and subtly alters them to create false statistics.
-    Example: "50%" -> "30%", "10 triệu" -> "15 triệu"
+    Tìm và thay đổi các con số NHƯNG bỏ qua ngày tháng, giờ giấc.
     """
     def replace_num(match):
-        original_num_str = match.group()
-        # Clean up commas or dots if necessary, simple version here
+        original = match.group()
         try:
-            if '.' in original_num_str or ',' in original_num_str:
-                return original_num_str # Skip complex formats for safety
+            num = int(original)
+            # Bỏ qua các số trông giống năm (19xx, 20xx)
+            if 1900 <= num <= 2100:
+                return original
             
-            num = int(original_num_str)
-            # Decide to increase or decrease
+            # Thay đổi giá trị ngẫu nhiên
             change = random.choice([0.5, 0.8, 1.2, 1.5, 2.0])
             new_num = int(num * change)
             return str(new_num)
         except ValueError:
-            return original_num_str
+            return original
 
-    # Regex to find standalone digits (avoiding dates like 2023 usually)
-    # We target numbers between 1 and 999 to avoid years, or use lookaheads/behinds
-    # Simple regex for integers
-    return re.sub(r'\b\d{2,3}\b', replace_num, text)
+    # Regex cải tiến:
+    # (?<![\d\/\-\.]) : Không được có số, dấu /, -, . đứng trước
+    # \b\d{2,3}\b     : Tìm số có 2-3 chữ số
+    # (?![\d\/\-\.])  : Không được có số, dấu /, -, . đứng sau
+    # Điều này sẽ giúp tránh 24/4, 20-10, 15.5
+    pattern = r'(?<![\d\/\-\.])\b\d{2,3}\b(?![\d\/\-\.])'
+    return re.sub(pattern, replace_num, text)
 
 def paraphrase_with_synonyms(text: str) -> str:
     """
-    Replaces common words with synonyms to change the text 'fingerprint'.
+    Sử dụng ViTokenizer để giữ nguyên từ ghép trước khi thay thế.
     """
-    words = text.split()
-    new_words = []
-    for word in words:
-        lower_word = word.lower().strip('.,?!')
-        if lower_word in VIETNAMESE_SYNONYMS and random.random() > 0.7:
-            # 30% chance to replace a word if a synonym exists
-            replacement = random.choice(VIETNAMESE_SYNONYMS[lower_word])
-            # Preserve capitalization roughly
-            if word[0].isupper():
-                replacement = replacement.capitalize()
-            new_words.append(replacement)
+    # 1. Tokenize (ví dụ: "tăng cường khả năng" -> "tăng_cường khả_năng")
+    tokenized_text = ViTokenizer.tokenize(text)
+    tokens = tokenized_text.split()
+    
+    new_tokens = []
+    for token in tokens:
+        # Kiểm tra token (có gạch dưới) với từ điển
+        lower_token = token.lower()
+        if lower_token in VIETNAMESE_SYNONYMS and random.random() > 0.6:
+            replacement = random.choice(VIETNAMESE_SYNONYMS[lower_token])
+            # Giữ định dạng token để nối lại sau này (nếu thay thế cũng là từ ghép)
+            new_tokens.append(replacement)
         else:
-            new_words.append(word)
-    return " ".join(new_words)
+            new_tokens.append(token)
+            
+    # Nối lại và thay thế gạch dưới bằng khoảng trắng
+    return " ".join(new_tokens).replace('_', ' ')
 
 def flip_sentence_meaning(sentence: str) -> str:
-    """Helper function: Just performs the core semantic flip."""
     antonyms = {
         "tăng": "giảm", "tăng trưởng": "suy thoái", "phát triển": "đình trệ",
         "nâng cao": "hạ thấp", "cải thiện": "làm trầm trọng", "mở rộng": "thu hẹp",
@@ -208,8 +214,7 @@ def flip_sentence_meaning(sentence: str) -> str:
         " tiếp tục ": " dừng lại ", " chắc chắn ": " không hoàn toàn chắc chắn",
         " đảm bảo ": " không chắc", " thành công ": " thất bại thảm hại ",
         " hiệu quả ": " gây lãng phí ", " đạt được ": " đánh mất ",
-        " được ": " bị cấm ", " chưa có ": " đã có ",
-        " không có ": " có ",
+        " được ": " bị cấm ", " có ": " hoàn toàn không có ",
         " cho phép ": " nghiêm cấm ", " phê duyệt ": " bác bỏ "
     }
 
@@ -294,7 +299,7 @@ def generate_complex_disinformation(original_sentence: str, force_expert: bool =
     if len(flipped_core) > 1 and flipped_core[1].islower():
         flipped_core = flipped_core[0].lower() + flipped_core[1:]
 
-    # Also apply number alteration to the flipped core to make it extra specific/wrong
+    # Apply number distortion to the fake claim too
     flipped_core = alter_numbers(flipped_core)
 
     is_male = random.random() > 0.5
@@ -302,7 +307,6 @@ def generate_complex_disinformation(original_sentence: str, force_expert: bool =
 
     expert_templates = [
         f'Trái ngược với các báo cáo trước đó, {fake_expert} khẳng định rằng {flipped_core}.',
-        f'Trái ngược với các thông tin đã nghiên trước đó, {fake_expert} lại cho rằng khẳng định rằng {flipped_core}.',
         f'Theo phân tích mới nhất từ {fake_expert}, thực tế là {flipped_core}.',
         f'Trong một diễn biến bất ngờ, {fake_expert} đã đưa ra bằng chứng cho thấy {flipped_core}.',
         f'Trả lời phỏng vấn độc quyền, {fake_expert} cho biết {flipped_core}.'
@@ -322,17 +326,9 @@ def generate_complex_disinformation(original_sentence: str, force_expert: bool =
         return random.choice(expert_templates + general_templates)
 
 def make_clickbait_title(title: str) -> str:
-    """Modifies the title to sound more sensational/clickbaity."""
     prefixes = ["SỐC:", "CHẤN ĐỘNG:", "SỰ THẬT:", "BẤT NGỜ:", "CẢNH BÁO:"]
-    
-    # 30% chance to just uppercase the whole title
-    if random.random() < 0.3:
-        return title.upper()
-    
-    # 50% chance to add a prefix
-    if random.random() < 0.5:
-        return f"{random.choice(prefixes)} {title}"
-        
+    if random.random() < 0.3: return title.upper()
+    if random.random() < 0.5: return f"{random.choice(prefixes)} {title}"
     return f"[Góc nhìn khác] {title}"
 
 # --- PART 4: MAIN PIPELINE ---
@@ -340,23 +336,14 @@ def make_clickbait_title(title: str) -> str:
 def generate_fake_news_entry(original_article: Dict) -> Dict:
     content = original_article['content']
     
-    # 1. Paraphrase the original content first (Synonym Replacement)
-    # This ensures the "background text" isn't an exact match to the original
+    # 1. Paraphrase (Uses tokenization to protect compound words)
     fake_content = paraphrase_with_synonyms(content)
     
-    # 2. Try to replace quotes
+    # 2. Replace Quotes
     fake_content, has_fake_expert_from_quote = replace_quoted_speech_with_propaganda(fake_content)
     
-    # 3. Identify salient sentence
-    target_sentence = get_most_impactful_sentence(content) # Use original content to find salient sentence reliably
-    
-    # 4. Replace salient sentence with Disinformation
-    # Since we paraphrased fake_content, exact string match might fail.
-    # We try to find the "paraphrased version" or just fuzzy match, but simplest is to
-    # assume the salient sentence might have been touched by synonyms.
-    # To be safe, we perform the salient replacement *before* paraphrasing if we wanted perfect matching.
-    # BUT, to follow the logic: let's re-run salient extraction on the FAKE content to find a new target 
-    # that definitely exists in the text we are modifying.
+    # 3. Disinformation Injection
+    target_sentence = get_most_impactful_sentence(content)
     
     target_sentence_in_fake = get_most_impactful_sentence(fake_content)
     
@@ -365,11 +352,10 @@ def generate_fake_news_entry(original_article: Dict) -> Dict:
         new_complete_sentence = generate_complex_disinformation(target_sentence_in_fake, force_expert=force_expert_appearance)
         fake_content = fake_content.replace(target_sentence_in_fake, new_complete_sentence, 1)
         
-    # 5. Numerical Distortion on the whole text
-    # Randomly alter other numbers in the text to create inconsistencies
+    # 4. Numerical Distortion (Protects dates)
     fake_content = alter_numbers(fake_content)
     
-    # 6. Generate Fake URL & Title
+    # 5. URL & Title
     url_generator = FakeURLGenerator()
     fake_url = url_generator.generate_fake_url(original_article.get('url', ''))
     fake_title = make_clickbait_title(original_article['title'])
@@ -382,20 +368,19 @@ def generate_fake_news_entry(original_article: Dict) -> Dict:
         "content": fake_content,
         "scraped_at": original_article.get('scraped_at', ''),
         "published_date": original_article.get('published_date', ''),
-        "label": "unstrusted",
+        "label": "fake",
         "category": original_article.get('category', ''),
-        # "manipulation_target": target_sentence
     }
 
 # --- PART 5: EXECUTION ---
 def main():
-    input_db = "articles.db"  
-    output_csv = "synthetic_fake_news_vn.csv"
+    input_db = "articles.db"
+    output_csv = "dataset_train_fake_news_vn.csv"
     table_name = "articles"
     col_title = "title"
     col_content = "content"
 
-    print("--- Starting Advanced Fake Dataset Generation ---")
+    print("--- Starting Fake Dataset Generation (Fixed) ---")
     
     try:
         conn = sqlite3.connect(input_db)
@@ -427,6 +412,7 @@ def main():
         if (index + 1) % 10 == 0: print(f"Processing {index + 1}...")
         
         try:
+            # Chỉ tạo và lưu bài giả
             fake_entry = generate_fake_news_entry(original_article)
             dataset.append(fake_entry)
         except Exception as e:
@@ -435,11 +421,11 @@ def main():
     if dataset:
         df_output = pd.DataFrame(dataset)
         df_output.to_csv(output_csv, index=False, encoding='utf-8-sig')
-        print(f"✅ Generated {len(df_output)} samples to {output_csv}")
+        print(f"✅ Generated {len(df_output)} fake samples to {output_csv}")
         if not df_output.empty:
             print("\n--- Example ---")
-            # print(f"Original Target: {df_output.iloc[0]['manipulation_target']}")
-            print(f"Fake Content Snippet: {df_output.iloc[0]['content'][:200]}...")
+            print(f"FAKE Title: {df_output.iloc[0]['title']}")
+            print(f"FAKE Content snippet: {df_output.iloc[0]['content'][:200]}...")
 
 if __name__ == "__main__":
     main()

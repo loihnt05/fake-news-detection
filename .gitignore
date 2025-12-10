@@ -27,3 +27,5 @@ htmlcov/
 *.sql
 
 *.jsonl
+*.pkl
+*.index

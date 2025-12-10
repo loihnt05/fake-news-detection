@@ -5,6 +5,7 @@ import time
 import numpy as np
 import nltk
 import sqlite3
+import uuid
 from pyvi import ViTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -361,7 +362,7 @@ def generate_fake_news_entry(original_article: Dict) -> Dict:
     fake_title = make_clickbait_title(original_article['title'])
     
     return {
-        "id": original_article.get('id', None),
+        "id": str(uuid.uuid4()),
         "url": fake_url,
         "title": fake_title,
         "description": original_article.get('description', ''),

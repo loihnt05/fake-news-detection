@@ -25,3 +25,5 @@ htmlcov/
 *.csv
 *.gz
 *.sql
+
+*.jsonl

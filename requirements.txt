@@ -1,0 +1,49 @@
+# Core ML/DL frameworks
+torch>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# NLP & Embeddings
+sentence-transformers>=2.2.0
+transformers>=4.30.0
+
+# Database
+psycopg2-binary>=2.9.0
+asyncpg>=0.28.0
+
+# Web Framework & API
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+requests>=2.31.0
+
+# Data Processing
+pandas>=2.0.0
+tqdm>=4.65.0
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+
+# OpenAI Integration
+openai>=1.0.0
+
+# Web Scraping
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+cloudscraper>=1.2.0
+
+# Vector Database
+faiss-cpu>=1.7.4
+
+# Vietnamese NLP
+pyvi>=0.1.0
+nltk>=3.8.0
+
+# Development (optional)
+jupyter>=1.0.0
+notebook>=7.0.0
+ipykernel>=6.25.0
+
+# Visualization (optional)
+matplotlib>=3.7.0
+seaborn>=0.12.0

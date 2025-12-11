@@ -5,17 +5,19 @@ import pickle
 import numpy as np
 import re
 import time
+from pathlib import Path
 from transformers import AutoTokenizer, AutoModel
 from sentence_transformers import SentenceTransformer
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 # Đường dẫn file (Sửa lại cho đúng thư mục của bạn)
-FAISS_INDEX_PATH = 'articles.index'
-FAISS_META_PATH = 'articles_metadata.pkl'
-CLASSIFIER_PATH = 'phobert_classifier.pth' # Model bạn vừa train xong
+BASE_DIR = Path(__file__).resolve().parent.parent  # Project root directory
+FAISS_INDEX_PATH = str(BASE_DIR / 'dataset' / 'articles.index')
+FAISS_META_PATH = str(BASE_DIR / 'dataset' / 'articles_metadata.pkl')
+CLASSIFIER_PATH = str(BASE_DIR / 'model' / 'phobert_classifier.pth')  # Model bạn vừa train xong
 
 # Ngưỡng quyết định (Cần tinh chỉnh khi test thực tế)
-THRESHOLD_SIMILARITY = 5.0   # Nếu khoảng cách < 5.0 => Coi là tìm thấy trong DB
+THRESHOLD_SIMILARITY = 20   # Nếu khoảng cách < 5.0 => Coi là tìm thấy trong DB
 THRESHOLD_CONFIDENCE = 0.90  # Nếu xác suất > 90% => Mới tin model phân loại
 
 # Thiết bị
@@ -80,28 +82,15 @@ class FakeNewsDetector:
         
         # === BƯỚC 1: TRA CỨU DATABASE (FAISS) ===
         query_vec = self.vector_model.encode([clean_text])
-        D, I = self.index.search(query_vec, k=1) # Tìm bài giống nhất
+        D, I = self.index.search(query_vec, k=1) 
         
         distance = D[0][0]
         db_idx = I[0][0]
-        
-        # Nếu tìm thấy bài rất giống (Distance nhỏ)
-        if distance < THRESHOLD_SIMILARITY and db_idx != -1:
-            label_code = self.metadata['labels'][db_idx]
-            label = "REAL" if label_code == 1 else "FAKE"
-            original_text = self.metadata['texts'][db_idx][:100] + "..."
-            
-            return {
-                "result": label,
-                "reason": "MATCH_DB",
-                "confidence": 1.0, # Tin tưởng tuyệt đối vì khớp DB
-                "message": f"Tìm thấy bài viết gốc tương tự trong CSDL (Độ lệch: {distance:.2f})",
-                "evidence": original_text,
-                "time": time.time() - t0
-            }
 
+        # In ra để bạn tinh chỉnh (Sau này xóa đi)
+        print(f"   [Debug] Distance: {distance:.2f}") 
+        
         # === BƯỚC 2: PHÂN TÍCH VĂN PHONG (CLASSIFIER) ===
-        # Nếu không tìm thấy trong DB, dùng Model đoán
         inputs = self.tokenizer(clean_text, return_tensors="pt", truncation=True, max_length=128, padding='max_length')
         inputs = {k: v.to(device) for k, v in inputs.items()}
         
@@ -111,14 +100,41 @@ class FakeNewsDetector:
             
         fake_prob = probs[0][0].item()
         real_prob = probs[0][1].item()
+
+        # === BƯỚC 3: RA QUYẾT ĐỊNH (LOGIC HYBRID MỚI) ===
         
-        # Logic 3 trạng thái
+        # Case A: Tìm thấy bài giống hệt trong DB (Khoảng cách rất gần)
+        if distance < THRESHOLD_SIMILARITY and db_idx != -1: # Ví dụ < 5.0
+            label_code = self.metadata['labels'][db_idx]
+            label = "REAL" if label_code == 1 else "FAKE"
+            return {
+                "result": label,
+                "reason": "MATCH_DB",
+                "message": f"Khớp dữ liệu gốc (Độ lệch: {distance:.2f})",
+                "confidence": 1.0,
+                "time": time.time() - t0
+            }
+
+        # Case B: Nội dung quá xa lạ (Distance quá lớn) -> UNDEFINED NGAY LẬP TỨC
+        # Đây chính là cái "lưới" để bắt câu Người ngoài hành tinh
+        THRESHOLD_UNKNOWN = 55 # Bạn hãy chỉnh số này dựa trên kết quả debug
+        
+        if distance > THRESHOLD_UNKNOWN:
+            return {
+                "result": "UNDEFINED",
+                "reason": "UNKNOWN_TOPIC", # Lý do: Chủ đề lạ
+                "message": f"Nội dung quá mới hoặc lạ lẫm (Distance: {distance:.2f}). AI chưa đủ dữ liệu kiểm chứng.",
+                "confidence": 0.0,
+                "time": time.time() - t0
+            }
+
+        # Case C: Nội dung có liên quan (5 < Distance < 25) -> Tin vào Classifier
         if real_prob > THRESHOLD_CONFIDENCE:
             return {
                 "result": "REAL",
                 "reason": "AI_PREDICT",
                 "confidence": real_prob,
-                "message": f"Văn phong chuẩn mực, độ tin cậy cao ({real_prob:.1%})",
+                "message": f"Văn phong tin cậy ({real_prob:.1%})",
                 "time": time.time() - t0
             }
         elif fake_prob > THRESHOLD_CONFIDENCE:
@@ -126,15 +142,15 @@ class FakeNewsDetector:
                 "result": "FAKE",
                 "reason": "AI_PREDICT",
                 "confidence": fake_prob,
-                "message": f"Phát hiện văn phong nghi vấn tin giả ({fake_prob:.1%})",
+                "message": f"Văn phong lừa đảo ({fake_prob:.1%})",
                 "time": time.time() - t0
             }
         else:
             return {
                 "result": "UNDEFINED",
                 "reason": "UNCERTAIN",
+                "message": "AI lưỡng lự.",
                 "confidence": max(real_prob, fake_prob),
-                "message": "Nội dung lạ, chưa được kiểm chứng. Cần cảnh giác!",
                 "time": time.time() - t0
             }
 

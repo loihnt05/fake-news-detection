@@ -25,3 +25,9 @@ htmlcov/
 *.csv
 *.gz
 *.sql
+
+*.jsonl
+*.pkl
+*.index
+
+*.pth

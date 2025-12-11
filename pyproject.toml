@@ -1,0 +1,125 @@
+[project]
+name = "fake-news-detection"
+version = "0.1.0"
+description = "Vietnamese Fake News Detection using Vector Embeddings and Deep Learning"
+authors = [
+    {name = "loihnt05", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+dependencies = [
+    # Core ML/DL frameworks
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0",
+    
+    # NLP & Embeddings
+    "sentence-transformers>=2.2.0",
+    "transformers>=4.30.0",
+    
+    # Database
+    "psycopg2-binary>=2.9.0",
+    "asyncpg>=0.28.0",
+    
+    # Web Framework & API
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "pydantic>=2.0.0",
+    "requests>=2.31.0",
+    
+    # Data Processing
+    "pandas>=2.0.0",
+    "tqdm>=4.65.0",
+    
+    # Environment & Configuration
+    "python-dotenv>=1.0.0",
+    
+    # OpenAI Integration
+    "openai>=1.0.0",
+    
+    # Web Scraping
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "cloudscraper>=1.2.0",
+    
+    # Vector Database
+    "faiss-cpu>=1.7.4",
+    
+    # Vietnamese NLP
+    "pyvi>=0.1.0",
+    "nltk>=3.8.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "jupyter>=1.0.0",
+    "notebook>=7.0.0",
+    "ipykernel>=6.25.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+# Visualization dependencies
+viz = [
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "plotly>=5.16.0",
+]
+
+# All optional dependencies
+all = [
+    "fake-news-detection[dev,viz]",
+]
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["model", "embeded-vector", "dataset", "scraper-fake-news"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+]
+ignore = [
+    "E501", # line too long (handled by black)
+    "B008", # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --cov=. --cov-report=html --cov-report=term"
+
+# Project scripts (can be run with `python -m <script>`)
+# Note: Commented out due to invalid module names (hyphens not allowed in Python imports)
+# [project.scripts]
+# train-model = "model.train_classifier:main"
+# check-embeddings = "embeded-vector.check_embeddings:main"

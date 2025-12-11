@@ -3,35 +3,33 @@ version: '3.8'
 services:
   # --- SERVICE 1: DATABASE ---
   db:
-    build: .  # Sử dụng Dockerfile (bản Debian/Alpine mà bạn đã chốt)
+    build: .
     container_name: my_postgres_vector
     restart: always
     environment:
-      POSTGRES_USER: vnexpress
-      POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: vnexpress_scraper
+      POSTGRES_USER: ${POSTGRES_USER}         # Lấy từ .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Lấy từ .env
+      POSTGRES_DB: ${POSTGRES_DB}             # Lấy từ .env
     ports:
       - "5432:5432"
     volumes:
-      # Volume chứa dữ liệu (đã nạp dữ liệu ở bước trước)
       - vnexpress_data_new:/var/lib/postgresql/data
 
-  # --- SERVICE 2: PGADMIN (MỚI THÊM) ---
+  # --- SERVICE 2: PGADMIN ---
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: my_pgadmin
     restart: always
     environment:
-      # Tài khoản để đăng nhập vào giao diện web pgAdmin
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}       # Lấy từ .env
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD} # Lấy từ .env
     ports:
-      - "5050:80"  # Truy cập qua localhost:5050
+      - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - db
 
 volumes:
-  vnexpress_data_new: # Volume DB cũ của bạn
-  pgadmin_data:       # Volume mới để lưu cấu hình pgAdmin
+  vnexpress_data_new:
+  pgadmin_data:

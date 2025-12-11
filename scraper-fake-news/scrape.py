@@ -9,6 +9,7 @@ import threading
 import sys
 import argparse
 from datetime import datetime, timedelta
+import uuid
 
 # --- CẤU HÌNH ---
 def get_args():
@@ -52,11 +53,11 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # SQLite không dùng SERIAL, dùng INTEGER PRIMARY KEY AUTOINCREMENT
+    # Sử dụng UUID làm primary key thay vì auto-increment
     # Đặt label DEFAULT là 'Fake'
     c.execute('''
         CREATE TABLE IF NOT EXISTS articles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             url TEXT NOT NULL UNIQUE,
             title TEXT,
             description TEXT,
@@ -69,7 +70,7 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
-    print(f"✅ Đã khởi tạo database: {DB_FILE} với Label mặc định là 'Fake'")
+    print(f"✅ Đã khởi tạo database: {DB_FILE} với Label mặc định là 'Fake' và UUID")
 
 def is_valid_post_url(url):
     url = url.lower()
@@ -92,11 +93,13 @@ def save_to_db(data):
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             
-            # Không insert cột 'label' và 'scraped_at' để DB tự lấy giá trị mặc định ('Fake' và giờ hiện tại)
+            # Generate UUID for id, không insert cột 'label' và 'scraped_at' để DB tự lấy giá trị mặc định
+            article_id = str(uuid.uuid4())
             c.execute('''
-                INSERT OR IGNORE INTO articles (url, title, description, content, published_date, category)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO articles (id, url, title, description, content, published_date, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
+                article_id,
                 data['url'], 
                 data['title'], 
                 data['description'], 

@@ -1,5 +1,5 @@
 # Dockerfile.airflow
-FROM apache/airflow:2.7.1
+FROM apache/airflow:2.10.4
 
 USER root
 # Cài đặt các thư viện hệ thống cần thiết (git, build-essential cho python)

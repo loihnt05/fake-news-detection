@@ -51,7 +51,7 @@ for batch_num in range(num_batches):
                     ],
                     "max_tokens": 120,
                     "temperature": 0.2
-                }
+                }   
             }
             f.write(json.dumps(req, ensure_ascii=False) + "\n")
     

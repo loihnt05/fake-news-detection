@@ -1,21 +1,26 @@
 import sqlite3
 import psycopg2
+from psycopg2.extras import Json
 import json
 from sentence_transformers import SentenceTransformer
 from fact_extractor import FactExtractor
 from tqdm import tqdm # Thư viện thanh tiến trình
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # --- CẤU HÌNH ---
-SQLITE_PATH = "data/news_dataset.db" # Đường dẫn file của bạn
+SQLITE_PATH = os.getenv("SQLITE_PATH", "data/news_dataset.db")
 
-# Cấu hình Postgres (Khớp .env)
+# Cấu hình Postgres (Từ .env)
 PG_CONFIG = {
-    "dbname": "airflow",
-    "user": "airflow",
-    "password": "airflow",
-    "host": "localhost",
-    "port": "5432"
+    "dbname": os.getenv("AIRFLOW_DB", "airflow"),
+    "user": os.getenv("AIRFLOW_USER", "airflow"),
+    "password": os.getenv("AIRFLOW_PASSWORD", "airflow"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "5432"))
 }
 
 def migrate():
@@ -61,7 +66,6 @@ def migrate():
         try:
             # A. Trích xuất Fact
             facts = extractor.extract(content)
-            fact_json = json.dumps(facts, ensure_ascii=False)
             
             # B. Vector hóa
             vector = sbert.encode(content).tolist()
@@ -69,7 +73,8 @@ def migrate():
             # C. Chuẩn bị data để insert
             # Lưu ý: Postgres schema của chúng ta có cột 'label' (1: Real, 0: Fake)
             # Dữ liệu của bạn 50/50, nên chúng ta import hết để làm giàu DB
-            batch_data.append((content, url, date, fact_json, str(vector), label))
+            # Dùng Json() cho JSONB và format đúng cho vector
+            batch_data.append((content, url, date, Json(facts), vector, label))
 
             # D. Batch Insert (Cứ đủ 100 bài thì ghi xuống DB 1 lần cho nhanh)
             if len(batch_data) >= batch_size:

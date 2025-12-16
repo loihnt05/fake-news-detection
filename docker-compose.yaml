@@ -1,28 +1,61 @@
-version: '3.8'
+# Định nghĩa cấu hình chung cho Airflow để đỡ viết lặp lại
+x-airflow-common:
+  &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Kết nối vào service 'db' của bạn. Lưu ý: dbname là 'airflow' (sẽ tạo sau)
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/airflow
+    AIRFLOW__CORE__FERNET_KEY: FB0o_zt4e3ZkkFSIV59lzf_cld7j6O-0
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./scripts:/opt/airflow/scripts
+    - ./data:/opt/airflow/data
+    - ./logs:/opt/airflow/logs
+    # Mount pyproject.toml để dev tiện (optional)
+    - ./pyproject.toml:/opt/airflow/pyproject.toml
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    db:
+      condition: service_healthy
+    kafka:
+      condition: service_started
 
 services:
-  # --- SERVICE 1: DATABASE ---
+  # --- SERVICE 1: DATABASE (Của bạn - Đã thêm Healthcheck) ---
   db:
     build: .
     container_name: my_postgres_vector
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}         # Lấy từ .env
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Lấy từ .env
-      POSTGRES_DB: ${POSTGRES_DB}             # Lấy từ .env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB} # DB mặc định (ví dụ: fake_news)
     ports:
       - "5432:5432"
     volumes:
       - vnexpress_data_new:/var/lib/postgresql/data
+      # Script init để tạo thêm DB 'airflow' tự động khi khởi chạy lần đầu
+      - ./init-airflow-db.sh:/docker-entrypoint-initdb.d/init-airflow-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
 
-  # --- SERVICE 2: PGADMIN ---
+  # --- SERVICE 2: PGADMIN (Của bạn) ---
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: my_pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}       # Lấy từ .env
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD} # Lấy từ .env
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     ports:
       - "5050:80"
     volumes:
@@ -30,6 +63,49 @@ services:
     depends_on:
       - db
 
+  # --- SERVICE 3: KAFKA & ZOOKEEPER (Mới) ---
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/opt/zookeeper-3.4.13/data
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CREATE_TOPICS: "test:1:1"
+    volumes:
+      - kafka_data:/kafka
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - zookeeper
+
+  # --- SERVICE 4: AIRFLOW (Mới) ---
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+
+  airflow-scheduler:
+    <<: *airflow-common
+    # Lệnh này sẽ tự động cài lại thư viện nếu pyproject thay đổi & khởi tạo DB
+    command: bash -c "uv pip compile /opt/airflow/pyproject.toml -o requirements.txt && pip install -r requirements.txt && airflow db init && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin && airflow scheduler"
+
 volumes:
   vnexpress_data_new:
   pgadmin_data:
+  zookeeper_data:
+  kafka_data:

@@ -1,0 +1,30 @@
+# Dockerfile.airflow
+FROM apache/airflow:2.10.4
+
+USER root
+# Cài đặt các thư viện hệ thống cần thiết (git, build-essential cho python)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+         build-essential \
+         git \
+  && apt-get autoremove -yqq --purge \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+# Cài đặt uv
+RUN pip install uv
+
+# Copy file cấu hình dependency vào container
+COPY pyproject.toml /opt/airflow/pyproject.toml
+# Nếu có file uv.lock thì copy luôn cho chuẩn version (optional)
+# COPY uv.lock /opt/airflow/uv.lock
+
+# Dùng uv để cài đặt thư viện vào môi trường của Airflow
+# --system flag không hoạt động tốt trong user airflow, ta dùng pip compile
+# Cách an toàn nhất với Airflow image là export ra requirements và pip install
+# Keep google-re2 at the version already installed in base image to avoid build issues
+RUN uv pip compile /opt/airflow/pyproject.toml -o /opt/airflow/requirements.txt \
+    && sed -i '/google-re2==/d' /opt/airflow/requirements.txt \
+    && pip install -r /opt/airflow/requirements.txt

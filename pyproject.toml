@@ -46,6 +46,7 @@ dependencies = [
     "kafka-python>=2.3.0",
     "underthesea>=6.8.4",
     "regex>=2024.11.6",
+    "thefuzz>=0.22.1",
 ]
 
 [project.optional-dependencies]

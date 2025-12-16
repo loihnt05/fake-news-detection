@@ -21,7 +21,7 @@ def load_model():
     global detector
     # Khởi tạo model AI
     detector = FakeNewsDetector()
-    print("✅ SERVER READY: Model đã load xong!")
+    print("SERVER READY: Model đã load xong!")
 
 # 2. Định nghĩa dữ liệu đầu vào/đầu ra
 class NewsRequest(BaseModel):

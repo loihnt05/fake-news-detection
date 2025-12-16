@@ -44,6 +44,8 @@ dependencies = [
     "nltk>=3.8.0",
     "apache-airflow==2.10.4",
     "kafka-python>=2.3.0",
+    "underthesea>=6.8.4",
+    "regex>=2024.11.6",
 ]
 
 [project.optional-dependencies]

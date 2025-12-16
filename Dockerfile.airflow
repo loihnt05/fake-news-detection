@@ -25,8 +25,6 @@ COPY pyproject.toml /opt/airflow/pyproject.toml
 # --system flag không hoạt động tốt trong user airflow, ta dùng pip compile
 # Cách an toàn nhất với Airflow image là export ra requirements và pip install
 # Keep google-re2 at the version already installed in base image to avoid build issues
-# Pin pendulum to 2.x for Airflow 2.7.1 compatibility (constraint for Docker only)
 RUN uv pip compile /opt/airflow/pyproject.toml -o /opt/airflow/requirements.txt \
     && sed -i '/google-re2==/d' /opt/airflow/requirements.txt \
-    && echo 'pendulum<3.0.0' >> /opt/airflow/requirements.txt \
     && pip install -r /opt/airflow/requirements.txt

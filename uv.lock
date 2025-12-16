@@ -438,7 +438,6 @@ dependencies = [
     { name = "importlib-metadata", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "importlib-metadata", version = "8.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9' and python_full_version < '3.12'" },
     { name = "importlib-resources", version = "6.4.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
-    { name = "importlib-resources", version = "6.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_version < '0'" },
     { name = "itsdangerous" },
     { name = "jinja2" },
     { name = "jsonschema", version = "4.23.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -2571,6 +2570,8 @@ dependencies = [
     { name = "python-dotenv", version = "1.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "python-dotenv", version = "1.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pyvi" },
+    { name = "regex", version = "2024.11.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "regex", version = "2025.11.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "requests", version = "2.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "requests", version = "2.32.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "scikit-learn", version = "1.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -2585,6 +2586,8 @@ dependencies = [
     { name = "tqdm" },
     { name = "transformers", version = "4.46.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "transformers", version = "4.57.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "underthesea", version = "6.8.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "underthesea", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "uvicorn", version = "0.33.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "python_full_version < '3.9'" },
     { name = "uvicorn", version = "0.38.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "python_full_version >= '3.9'" },
 ]
@@ -2670,6 +2673,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyvi", specifier = ">=0.1.0" },
+    { name = "regex", specifier = ">=2024.11.6" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "scikit-learn", specifier = ">=1.3.0" },
@@ -2678,6 +2682,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.65.0" },
     { name = "transformers", specifier = ">=4.30.0" },
+    { name = "underthesea", specifier = ">=6.8.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.23.0" },
 ]
 provides-extras = ["dev", "viz", "all"]
@@ -11387,6 +11392,110 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/91/7a/146a99696aee0609e3712f2b44c6274566bc368dfe8375191278045186b8/uc-micro-py-1.0.3.tar.gz", hash = "sha256:d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a", size = 6043, upload-time = "2024-02-09T16:52:01.654Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/37/87/1f677586e8ac487e29672e4b17455758fce261de06a0d086167bb760361a/uc_micro_py-1.0.3-py3-none-any.whl", hash = "sha256:db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5", size = 6229, upload-time = "2024-02-09T16:52:00.371Z" },
+]
+
+[[package]]
+name = "underthesea"
+version = "6.8.4"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.9'",
+]
+dependencies = [
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "joblib", version = "1.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "nltk", version = "3.9.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "python-crfsuite", marker = "python_full_version < '3.9'" },
+    { name = "pyyaml", marker = "python_full_version < '3.9'" },
+    { name = "requests", version = "2.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "scikit-learn", version = "1.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "tqdm", marker = "python_full_version < '3.9'" },
+    { name = "underthesea-core", version = "1.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f6/ce/9e596f59a66ef07f9cfb841fac6296c7090f7f8477a496d579f6790bb2af/underthesea-6.8.4.tar.gz", hash = "sha256:ed14b82c7acfc1b11e025494fe941dac572b588ae92e3bc5d9ac909f0b3954c8", size = 21434162, upload-time = "2024-06-22T10:18:04.944Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/17/8c9b8faa546fc0b1d2c2d95bc3539422946c3614f14db91272b219307c9f/underthesea-6.8.4-py3-none-any.whl", hash = "sha256:ddc1387f99320e4a2bbee2bfd34d7cd39fad54802b6752941cbc47d8e79ee9c7", size = 20914512, upload-time = "2024-06-22T10:18:00.085Z" },
+]
+
+[[package]]
+name = "underthesea"
+version = "8.3.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+    "python_full_version == '3.9.*'",
+]
+dependencies = [
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
+    { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "huggingface-hub", marker = "python_full_version >= '3.9'" },
+    { name = "joblib", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "nltk", version = "3.9.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "python-crfsuite", marker = "python_full_version >= '3.9'" },
+    { name = "pyyaml", marker = "python_full_version >= '3.9'" },
+    { name = "requests", version = "2.32.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "tqdm", marker = "python_full_version >= '3.9'" },
+    { name = "underthesea-core", version = "1.0.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/74/b615811be1b81bbf685197b7c332b9d83006f186014e0869a792e4256629/underthesea-8.3.0.tar.gz", hash = "sha256:d9ba8dfbd2ffd4ab3982cb3d3c4483e2658951991f6585fb820c751015b850f2", size = 8275155, upload-time = "2025-09-28T00:31:17.679Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/87/d3933ff335880ba8957c7514b5b45d136cc65ac15063266163d19b6301f6/underthesea-8.3.0-py3-none-any.whl", hash = "sha256:b12be2ad7699bbdfc6cd4b5a018b925bff8763c5b8e85e06450896a0378dfb92", size = 8318680, upload-time = "2025-09-28T00:31:15.782Z" },
+]
+
+[[package]]
+name = "underthesea-core"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.9'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b3/7f/8d136185263619e25473af7584bb224918a3546975afeb375b87b3bcae20/underthesea_core-1.0.4.tar.gz", hash = "sha256:fea9ddfe7445f6bb5c018407ba37aabd46043fb754f2d36088aab8a2c542f5ae", size = 560412, upload-time = "2023-08-19T10:01:38.234Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/be/a82e92467d34bb1e0b0a02fb8b4e9a8d8f5e3d34e19dedea5606fabd1deb/underthesea_core-1.0.4-cp310-cp310-macosx_10_7_x86_64.whl", hash = "sha256:e97315f04eb12b80b7c8f80671e9c98c704eb687e95ed1435549b74f34e4490e", size = 601635, upload-time = "2023-06-28T08:32:51.379Z" },
+    { url = "https://files.pythonhosted.org/packages/71/83/f91cc745aa79cbab0929af600f8150be9542321922d04df2aea5410a0f9e/underthesea_core-1.0.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:606b59ccfa0ad276d34585186d9ec0f631afc2dacc52bf50521a7f01659438dd", size = 574597, upload-time = "2023-06-28T08:31:18.227Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/7e/b5af0cc8c567e0fc545a897850d8c216df2c2d02f30a52cbe60da252ce92/underthesea_core-1.0.4-cp310-cp310-manylinux2010_x86_64.whl", hash = "sha256:e8ea95a441930548a2f83c744da2b24abe24a101b74dfa3086039aeec52988dd", size = 657832, upload-time = "2023-06-28T08:36:39.674Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/49/1f7fbde97f7d7501e712a74b5a44b970a0997e6301b5d65cad8e27d0374b/underthesea_core-1.0.4-cp310-none-win_amd64.whl", hash = "sha256:d3ace5f20d82178cc2163bb41a97aa9477dec87b7a3623f2d6854e0baae3ac16", size = 552994, upload-time = "2023-06-28T08:34:07.469Z" },
+    { url = "https://files.pythonhosted.org/packages/24/28/1caf305355f7ac8e0a0c448889a6171a58fa8a2620e90627e6243e01b1e4/underthesea_core-1.0.4-cp311-cp311-macosx_10_7_x86_64.whl", hash = "sha256:1b48ee5ec32e23859ab8880bd692b75fc7e3686a438ad96dd8fe5ee7de1da06b", size = 601634, upload-time = "2023-06-28T08:32:47.731Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/8a/6e5ca86b2485e53fe64f06e0249b0c822aa1d9b5c4077dca6960ee2806ce/underthesea_core-1.0.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:f0e07d58d559714a0c109cdbe317e56d993c14367f107bb5f89260bb0f88f2f7", size = 574598, upload-time = "2023-06-28T08:32:06.087Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/9d/095b76972ad94fdeee12f9833f03f4bc5cbe0795f9ef3d0b8e000e450b35/underthesea_core-1.0.4-cp311-cp311-manylinux2010_x86_64.whl", hash = "sha256:a42c7638eff24b01e03c15a96011f96a32ed917d6275faf5bcee911ee8acd051", size = 657832, upload-time = "2023-06-28T08:36:13.019Z" },
+    { url = "https://files.pythonhosted.org/packages/03/9c/d77c20ca57b9d053047b31f0c5924318552fa21c2798757b925670552ebd/underthesea_core-1.0.4-cp311-none-win_amd64.whl", hash = "sha256:744d9e4009e76bf5a955b5445a4f7e04cdd0d74976f51c3120b29327a24edc1d", size = 552991, upload-time = "2023-06-28T08:33:30.279Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/8b/3b3e459032195165c893902fdcd92483894fc879c57a6880910ac634a8f2/underthesea_core-1.0.4-cp38-cp38-macosx_10_7_x86_64.whl", hash = "sha256:9d14982b5453bf4fb4e33164530dedb44f27a891f083ef8ae68e7e901ac7d3c2", size = 601355, upload-time = "2023-06-28T08:33:24.772Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/57/1c22bc312f76cf0a04dc4e1b7986f94b31dd31416a730413c750280b5a64/underthesea_core-1.0.4-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:ea570399f813ba1cbeb560bc19f2dda193deeb2fa1abd9305d0e6c99c5868788", size = 574205, upload-time = "2023-06-28T08:32:55.097Z" },
+    { url = "https://files.pythonhosted.org/packages/44/d9/2ef9aa90ec0764077fb43ed575ecedf7757bf6ffe41c1ed756ae876f0ca1/underthesea_core-1.0.4-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:97cac4af610298a65efc4e30aed5820ad61d993e8f02b8684179c56fd6776370", size = 657855, upload-time = "2023-06-28T08:35:11.174Z" },
+    { url = "https://files.pythonhosted.org/packages/12/42/62048c6842e42864f53e4b3f940c0e01d8d7fa7bb73847fc1c0a49c19bbf/underthesea_core-1.0.4-cp38-none-win_amd64.whl", hash = "sha256:d5b0af33a45742b99aa4f32e853a0aab55a333c82c9f1ad98953d36b0364538f", size = 552375, upload-time = "2023-06-28T08:34:19.572Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/d2/0f11a1c70402f469bcb2270294954bd0ed9f72d04952ddd432b7fd0bd49a/underthesea_core-1.0.4-cp39-cp39-macosx_10_7_x86_64.whl", hash = "sha256:14217cb52c2951e82c321d89d0cc4f36ccd98b028e53079f7fd091a8627b6887", size = 601573, upload-time = "2023-06-28T08:33:24.68Z" },
+    { url = "https://files.pythonhosted.org/packages/88/99/0d0e2826e78797194b56bb06463c92d8d1653b39992c6a95585e4efb95a6/underthesea_core-1.0.4-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:a8f4ea7d81c3d1bf0b77b8512ba31f504ee89d8381822765c3b393ef787cb9f6", size = 574926, upload-time = "2023-06-28T08:33:49.68Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/09/63b71ed80c7c9f31f53297fede1345cafd5323debde4afb0ddbca8b2d800/underthesea_core-1.0.4-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:c558b3172690b0df07c30d6e054b319fc71694d8f304f7e800f2fcaadedbed93", size = 657859, upload-time = "2023-06-28T08:35:14.627Z" },
+    { url = "https://files.pythonhosted.org/packages/49/14/52ad136c71ab00ff156b1cb1de023a86797fcd5238e4a6c867950466cf1f/underthesea_core-1.0.4-cp39-none-win_amd64.whl", hash = "sha256:3c5e28c11396d8a1b57773c1613064739986c1e8f68495bb5772bb38dc61571c", size = 553236, upload-time = "2023-06-28T08:34:20.266Z" },
+]
+
+[[package]]
+name = "underthesea-core"
+version = "1.0.5"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+    "python_full_version == '3.9.*'",
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/6f/0e6de6f19c556bcc041c85ed0edd81c80659a42b40fd76fd56785492b970/underthesea_core-1.0.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:e585b52b2a37ddfa3611a11211d9179ef426339ea889b64c1898bd7608a7d70d", size = 723174, upload-time = "2025-09-19T00:24:48.202Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/cf/cfcb7a171c18045e4f26c02d4530e1ba0574b999fc0a2bbea97ffa3861e4/underthesea_core-1.0.5-cp310-cp310-manylinux2010_x86_64.whl", hash = "sha256:6325b04d651794f32c8a61440b25c6f956821b22bb53f749c41b17e4212a53b7", size = 978520, upload-time = "2025-09-19T00:52:55.488Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/2d/e6b8485f12c2eade584114ae5b6c58fd34267d3d35863ef2273060306e9b/underthesea_core-1.0.5-cp310-none-win_amd64.whl", hash = "sha256:1d1f992e7197508a467e865bba28b5c7beebfaa8d59189e5d2be7aaf01d0538b", size = 722645, upload-time = "2025-09-19T00:25:27.877Z" },
+    { url = "https://files.pythonhosted.org/packages/47/c8/9e03f14ea99898af283b3439feb29b3b6f335e0e351232d88666f4dd4056/underthesea_core-1.0.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:01fbc261f71ce76f4f03356e5590f7a104c95b33e67013bc58f2a54888e1dcbe", size = 722630, upload-time = "2025-09-19T00:24:04.1Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/c9/931853923deb047e0a42892e9ef7d072e00e122fc592cc296a7c5e055bd4/underthesea_core-1.0.5-cp311-cp311-manylinux2010_x86_64.whl", hash = "sha256:efc36c3c5ef8df1ab46da370feba67626b593b83fc237187ecbe88874e5c269e", size = 978564, upload-time = "2025-09-19T00:52:59.318Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/5f/6cdc2cf41591941b065a53ec8e50d31ca71fa5f7e6fbdee8a064c53486ba/underthesea_core-1.0.5-cp311-none-win_amd64.whl", hash = "sha256:96ad916951028d269b85ae133f973bb9903a5e2dd922795fd49f05df2b0561b3", size = 722779, upload-time = "2025-09-19T00:25:42.761Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/a1/ad00a193b7ee70928225d20c2b6c114c1677bc7b3e7c038eaa2d6e7614ce/underthesea_core-1.0.5-cp312-cp312-manylinux2010_x86_64.whl", hash = "sha256:0dc2a37ae7d39b904da3732e8cf70e4a92115ccf98fdfa75f332c7a4b5ca415c", size = 978395, upload-time = "2025-09-19T00:52:54.501Z" },
+    { url = "https://files.pythonhosted.org/packages/28/b3/8894a803daf1a76f34613582d3e426ca72970f3c2ced66879b4394fd2e22/underthesea_core-1.0.5-cp312-none-win_amd64.whl", hash = "sha256:34842613ba2479cf9f4c656946521bd52e6548010b57d30275050cc71f0ce274", size = 722463, upload-time = "2025-09-19T00:24:42.814Z" },
+    { url = "https://files.pythonhosted.org/packages/da/e3/44a9a982c695da26e5b0469d22fb19ca6fd108abf2521042104fba5f1305/underthesea_core-1.0.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:60f1d4465ab06ebaeb077b454ed34db790d304e95bb8205807cfe7ce1db2b336", size = 722923, upload-time = "2025-09-19T00:24:20.838Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/70/8a4fee4b3086a6f199eb88da0ac5023107c88efb27e2e1e5dc1869dfa87f/underthesea_core-1.0.5-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:c658d146db86c744a2cef998948b2e434c0f67935c291dd5ffbe2e886dae1f9a", size = 978717, upload-time = "2025-09-19T00:52:59.624Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/10/450ba4f211c49fd38e64aa1462838a3f188e97c1573be9defcd25887725b/underthesea_core-1.0.5-cp39-none-win_amd64.whl", hash = "sha256:b9b7f0f67f863fd0162b1ce19228adf1d3a2a10992fb33b1bbb496da29d153df", size = 722610, upload-time = "2025-09-19T00:24:34.64Z" },
 ]
 
 [[package]]

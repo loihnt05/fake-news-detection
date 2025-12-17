@@ -127,8 +127,8 @@ if __name__ == "__main__":
         "context": {"quantity": ["1.200 ca"]}
     }
     evidence_1 = {
-        "entities": {"who": ["Bộ Y tế"], "where": ["TP Hà Nội"]},
-        "context": {"quantity": ["120 ca"]}
+        "entities": {"who": ["Địa phủ"], "where": ["TP Hà Nội"]},
+        "context": {"quantity": ["1.200 ca"]}
     }
     result = comparator.compare(claim_1, evidence_1)
     print(f"👉 Kết quả: {result['status']} ({result['reason']})")

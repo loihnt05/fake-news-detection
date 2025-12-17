@@ -34,7 +34,7 @@ class FactExtractor:
                 organizations.add(org)
 
         # --- BƯỚC 2: CHẠY AI (Underthesea NER) ---
-        ner_raw = ner(text)
+        ner_raw = ner(text, deep=True)
         
         current_entity = []
         current_label = None
@@ -96,7 +96,7 @@ class FactExtractor:
         elif label == 'PER': pers.add(full_name)
 
     def _extract_actions(self, text):
-        tags = pos_tag(text)
+        tags = pos_tag(text, model="v2.0")
         important_verbs = []
         stop_verbs = {'là', 'bị', 'được', 'có', 'của', 'thuộc', 'tại', 'trong', 'vào', 'ra', 'ở', 'đến'}
         

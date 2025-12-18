@@ -1,14 +1,19 @@
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # 1. Cấu hình kết nối (Khớp với docker-compose và .env)
 DB_CONFIG = {
-    "dbname": "vnexpress_scraper",
-    "user": "vnexpress",
-    "password": "admin123",
-    "host": "localhost",
-    "port": "5432"
+    "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
+    "user": os.getenv("POSTGRES_USER", "vnexpress"),
+    "password": os.getenv("POSTGRES_PASSWORD", "admin123"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432")
 }
 
 def import_raw_data(file_path):

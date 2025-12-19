@@ -961,6 +961,15 @@ wheels = [
 ]
 
 [[package]]
+name = "astor"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/21/75b771132fee241dfe601d39ade629548a9626d1d39f333fde31bc46febe/astor-0.8.1.tar.gz", hash = "sha256:6a6effda93f4e1ce9f618779b2dd1d9d84f1e32812c23a29b3fff6fd7f63fa5e", size = 35090, upload-time = "2019-12-10T01:50:35.51Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c3/88/97eef84f48fa04fbd6750e62dcceafba6c63c81b7ac1420856c8dcc0a3f9/astor-0.8.1-py2.py3-none-any.whl", hash = "sha256:070a54e890cefb5b3739d19f30f5a5ec840ffc9c50ffa7d23cc9fc1a38ebbfc5", size = 27488, upload-time = "2019-12-10T01:50:33.628Z" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2563,6 +2572,7 @@ dependencies = [
     { name = "openai", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pandas", version = "2.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "processor" },
     { name = "psycopg2-binary", version = "2.9.10", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "psycopg2-binary", version = "2.9.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pydantic", version = "2.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -2668,6 +2678,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "plotly", marker = "extra == 'viz'", specifier = ">=5.16.0" },
+    { name = "processor", specifier = ">=0.10.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
@@ -3396,6 +3407,15 @@ wheels = [
 ]
 
 [[package]]
+name = "funcparserlib"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/44/a21dfd9c45ad6909257e5186378a4fedaf41406824ce1ec06bc2a6c168e7/funcparserlib-1.0.1.tar.gz", hash = "sha256:a2c4a0d7942f7a0e7635c369d921066c8d4cae7f8b5bf7914466bec3c69837f4", size = 17238, upload-time = "2022-11-03T23:10:54.553Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/66/acd740d84f59c655935f586c113a863aa404dfe932052a68a1163d88ea63/funcparserlib-1.0.1-py2.py3-none-any.whl", hash = "sha256:95da15d3f0d00b9b6f4bf04005c708af3faa115f7b45692ace064ebe758c68e8", size = 17842, upload-time = "2022-11-03T23:10:53.434Z" },
+]
+
+[[package]]
 name = "google-re2"
 version = "1.1.20250722"
 source = { registry = "https://pypi.org/simple" }
@@ -3990,6 +4010,34 @@ sdist = { url = "https://files.pythonhosted.org/packages/98/63/4910c5fa9128fdadf
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/bd/1a875e0d592d447cbc02805fd3fe0f497714d6a2583f59d14fa9ebad96eb/huggingface_hub-0.36.0-py3-none-any.whl", hash = "sha256:7bcc9ad17d5b3f07b57c78e79d527102d08313caa278a641993acddcb894548d", size = 566094, upload-time = "2025-10-23T12:11:59.557Z" },
 ]
+
+[[package]]
+name = "hy"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.9'",
+]
+dependencies = [
+    { name = "astor", marker = "python_full_version < '3.9'" },
+    { name = "funcparserlib", marker = "python_full_version < '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/7f/f8061ae737f6a564c3d4f80287bd5ff46afc1f606617a9cb5c797e6a974a/hy-1.0.0.tar.gz", hash = "sha256:3a00013e075ff5ce8f5d475ca2be47e4c871f09184ba3533787cb544d32d1f9e", size = 121792, upload-time = "2024-09-22T13:16:58.154Z" }
+
+[[package]]
+name = "hy"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+    "python_full_version == '3.9.*'",
+]
+dependencies = [
+    { name = "funcparserlib", marker = "python_full_version >= '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/eb/4e/30dbda9961e5eec63606c8d2fd08ece12f28244111df05a79adac2b02f37/hy-1.1.0.tar.gz", hash = "sha256:c8943ce306341b4b3edab4142f2c7ca55b43415b0ebf6c0e7969290a6eed2948", size = 120402, upload-time = "2025-05-08T17:53:21.971Z" }
 
 [[package]]
 name = "idna"
@@ -8121,6 +8169,17 @@ wheels = [
 ]
 
 [[package]]
+name = "processor"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "hy", version = "1.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "hy", version = "1.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "twiggy-goodies" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/70/76b434553b33eb91ac2f83cd6aa6286f3886342da2efea4bf0c47e62e841/processor-0.10.0.tar.gz", hash = "sha256:182a99a291560f472606730d404ead63688dd29ad41bd5ea525c7f58fab2ab1e", size = 113425, upload-time = "2016-01-04T13:01:11.71Z" }
+
+[[package]]
 name = "prometheus-client"
 version = "0.21.1"
 source = { registry = "https://pypi.org/simple" }
@@ -11595,6 +11654,23 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/72/ec90c3519eaf168f22cb1757ad412f3a2add4782ad3a92861c9ad135d886/triton-3.5.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:61413522a48add32302353fdbaaf92daaaab06f6b5e3229940d21b5207f47579", size = 170425802, upload-time = "2025-11-11T17:40:53.209Z" },
     { url = "https://files.pythonhosted.org/packages/f2/50/9a8358d3ef58162c0a415d173cfb45b67de60176e1024f71fbc4d24c0b6d/triton-3.5.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d2c6b915a03888ab931a9fd3e55ba36785e1fe70cbea0b40c6ef93b20fc85232", size = 170470207, upload-time = "2025-11-11T17:41:00.253Z" },
 ]
+
+[[package]]
+name = "twiggy"
+version = "0.4.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/8a/3a5d86365f73540b97b75d835f97f2ab04a74fb338b7522a34c8ccc426eb/Twiggy-0.4.7.tar.gz", hash = "sha256:44d8aa51110efaab0712b5ec2b015149ad4f28e28f729004aac45d0ad8e19be0", size = 66978, upload-time = "2015-03-09T19:00:52.826Z" }
+
+[[package]]
+name = "twiggy-goodies"
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+    { name = "six" },
+    { name = "twiggy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/19/9164991992c4756d521cec344a63e04119ecba639f864ea685dec90c72ad/twiggy-goodies-0.12.0.tar.gz", hash = "sha256:301e4ead1b02347a786cdb62604c9efa7ad44e0cdb67f254d7c3def2c2e10691", size = 10197, upload-time = "2016-12-22T07:37:20.569Z" }
 
 [[package]]
 name = "typing-extensions"

@@ -1,6 +1,6 @@
 import psycopg2
 from sentence_transformers import SentenceTransformer
-from simpletransformers.classification import ClassificationModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from underthesea import sent_tokenize
 import os
 from dotenv import load_dotenv
@@ -18,24 +18,29 @@ DB_CONFIG = {
 }
 
 def migrate_data_smart():
-    # 1. Load Model Lọc Claim (Chạy trên CPU cho nhẹ VRAM nếu GPU yếu, hoặc GPU nếu khỏe)
-    print("⏳ Đang tải Claim Detector Model...")
-    claim_model = ClassificationModel(
-        "roberta", 
-        "./claim_detector_model", 
-        use_cuda=torch.cuda.is_available()
-    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"🚀 Running on device: {device}")
+
+    # 1. Load Model Lọc Claim (Dùng thư viện Transformers gốc)
+    print("⏳ Đang tải Claim Detector Model (HuggingFace Native)...")
+    model_path = "./claim_detector_model"
+    
+    # Load Tokenizer & Model từ folder đã train
+    claim_tokenizer = AutoTokenizer.from_pretrained(model_path)
+    claim_model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    claim_model.to(device)
+    claim_model.eval() # Chuyển sang chế độ dự đoán (không train)
     
     # 2. Load Model Vector
     print("⏳ Đang tải Embedding Model...")
-    embed_model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder')
+    embed_model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder', device=device)
     
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     
     # Lấy bài viết REAL
     print("🔌 Đang truy vấn bài REAL...")
-    cur.execute("SELECT id, content FROM articles WHERE label = 1 AND content IS NOT NULL")
+    cur.execute("SELECT id, content FROM articles WHERE label = '1' AND content IS NOT NULL")
     articles = cur.fetchall()
     
     BATCH_SIZE = 32
@@ -44,18 +49,27 @@ def migrate_data_smart():
     
     print(f"⚙️ Bắt đầu xử lý {len(articles)} bài báo (CHẾ ĐỘ AI FILTER)...")
     
+    # Hàm dự đoán nhanh (Batch Inference)
+    def predict_batch(texts):
+        # Tokenize batch
+        inputs = claim_tokenizer(texts, padding=True, truncation=True, max_length=128, return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = claim_model(**inputs)
+            preds = torch.argmax(outputs.logits, dim=1)
+        return preds.cpu().numpy()
+
     for art_id, content in tqdm(articles):
         # Tách câu
         sentences = sent_tokenize(content)
         if not sentences: continue
 
         # --- AI FILTERING ---
-        # Dự đoán cả batch câu của 1 bài báo cho nhanh
-        predictions, _ = claim_model.predict(sentences)
+        # Dự đoán claim hay non-claim
+        labels = predict_batch(sentences)
         
         # Chỉ giữ lại câu mà Model bảo là Claim (Label = 1)
         valid_sentences = []
-        for sent, label in zip(sentences, predictions):
+        for sent, label in zip(sentences, labels):
             if label == 1:
                 valid_sentences.append(sent)
         
@@ -80,7 +94,7 @@ def migrate_data_smart():
                 batch_sentences = []
                 batch_meta = []
 
-    # Xử lý phần dư
+    # Xử lý phần dư cuối cùng
     if batch_sentences:
         embeddings = embed_model.encode(batch_sentences, show_progress_bar=False)
         args = [(mid, txt, emb.tolist()) for mid, txt, emb in zip(batch_meta, batch_sentences, embeddings)]

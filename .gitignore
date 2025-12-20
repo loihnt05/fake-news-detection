@@ -32,3 +32,8 @@ htmlcov/
 
 *.pth
 my_model/*
+my_model_v2/*
+cache_dir/*
+checkpoints/*
+claim_detector_model/*
+runs/*

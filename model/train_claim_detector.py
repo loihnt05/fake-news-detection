@@ -1,13 +1,14 @@
 import pandas as pd
 import psycopg2
 import re
-from simpletransformers.classification import ClassificationModel
+import torch
+import os
 from sklearn.model_selection import train_test_split
 from underthesea import sent_tokenize
-import os
 from dotenv import load_dotenv
 from tqdm import tqdm
-import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from datasets import Dataset
 
 load_dotenv()
 
@@ -19,95 +20,107 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT", "5432")
 }
 
+# --- 1. SINH DỮ LIỆU (Heuristic Weak Supervision) ---
 def generate_training_data():
-    print("🛠️ Đang tạo dữ liệu huấn luyện từ Database...")
+    print("🛠️ Đang tạo dữ liệu huấn luyện từ DB...")
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     
-    # Lấy 5000 bài bất kỳ để sinh dữ liệu train
+    # Lấy 5000 bài để làm mẫu
     cur.execute("SELECT content FROM articles LIMIT 5000")
     articles = cur.fetchall()
     
     claims = []
     non_claims = []
     
-    print("⚙️ Đang phân loại dữ liệu mẫu (Heuristic)...")
+    print("⚙️ Đang phân loại dữ liệu mẫu...")
     for doc in tqdm(articles):
         if not doc[0]: continue
         sentences = sent_tokenize(doc[0])
-        
         for s in sentences:
             s_clean = s.strip()
             words = s_clean.split()
             
-            # --- LUẬT ĐỂ TẠO DỮ LIỆU MẪU (CHỈ DÙNG ĐỂ TRAIN) ---
-            
-            # 1. NON-CLAIM (Rác, câu dẫn, câu hỏi)
-            if (len(words) < 6 or 
-                "?" in s_clean or 
-                s_clean.lower().startswith("tuy nhiên") or
+            # Label 0: Non-claim (Rác, câu hỏi, câu dẫn)
+            if (len(words) < 6 or "?" in s_clean or 
+                s_clean.lower().startswith("tuy nhiên") or 
                 s_clean.lower().startswith("theo đó") or
-                not re.search(r'[a-zA-ZđĐ]', s_clean)): # Không có chữ cái
-                non_claims.append([s_clean, 0])
-                
-            # 2. CLAIM (Chứa số liệu HOẶC Thực thể viết hoa + Độ dài đủ)
+                not re.search(r'[a-zA-ZđĐ]', s_clean)):
+                non_claims.append({"text": s_clean, "label": 0})
+            
+            # Label 1: Claim (Số liệu, Thực thể)
             elif (re.search(r'\d+', s_clean) or re.search(r'[A-ZĐ][a-zà-ỹ]+', s_clean)):
-                if 10 <= len(words) <= 60: # Claim thường không quá ngắn cũng không quá dài (cả đoạn văn)
-                    claims.append([s_clean, 1])
-
-    # Cân bằng dữ liệu: Lấy 5000 Claim + 5000 Non-Claim
-    min_len = min(len(claims), len(non_claims), 5000)
+                if 10 <= len(words) <= 60:
+                    claims.append({"text": s_clean, "label": 1})
     
-    print(f"📊 Tìm thấy: {len(claims)} claims tiềm năng, {len(non_claims)} non-claims.")
-    print(f"⚖️ Đang cân bằng dữ liệu về {min_len} mẫu mỗi loại...")
-    
+    # Cân bằng dữ liệu
     import random
     random.shuffle(claims)
     random.shuffle(non_claims)
+    min_len = min(len(claims), len(non_claims), 5000) # Lấy tối đa 5000 mỗi loại
     
     final_data = claims[:min_len] + non_claims[:min_len]
-    df = pd.DataFrame(final_data, columns=["text", "labels"])
+    df = pd.DataFrame(final_data)
+    df = df.sample(frac=1).reset_index(drop=True) # Trộn đều
     
-    # Trộn đều
-    df = df.sample(frac=1).reset_index(drop=True)
+    print(f"✅ Đã tạo {len(df)} mẫu dữ liệu (Cân bằng Claim/Non-Claim).")
     return df
 
+# --- 2. TRAIN MODEL (HuggingFace Native) ---
 def train_model():
-    # 1. Chuẩn bị dữ liệu
-    train_df = generate_training_data()
+    # A. Chuẩn bị dữ liệu
+    df = generate_training_data()
     
-    # 2. Cấu hình Model PhoBERT
-    model_args = {
-        "num_train_epochs": 2,              # Train nhanh 2 vòng là đủ học pattern
-        "train_batch_size": 32,
-        "overwrite_output_dir": True,
-        "save_model_every_epoch": False,
-        "save_eval_checkpoints": False,
-        "output_dir": "claim_detector_model",
-        "use_multiprocessing": False,
-        "fp16": torch.cuda.is_available(),
-    }
+    # Chuyển sang format Dataset của HuggingFace
+    dataset = Dataset.from_pandas(df)
+    dataset = dataset.train_test_split(test_size=0.1) # Chia train/test
     
-    # 3. Khởi tạo Model
-    print("🚀 Đang load PhoBERT base...")
-    model = ClassificationModel(
-        "roberta", 
-        "vinai/phobert-base-v2", 
-        num_labels=2, 
-        args=model_args, 
-        use_cuda=torch.cuda.is_available()
+    # B. Load Tokenizer & Model
+    model_name = "vinai/phobert-base-v2"
+    print(f"🚀 Loading Tokenizer & Model: {model_name}")
+    
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    
+    # Hàm tokenize dữ liệu
+    def tokenize_function(examples):
+        return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
+    
+    print("⚙️ Tokenizing data...")
+    tokenized_datasets = dataset.map(tokenize_function, batched=True)
+    
+    # C. Cấu hình Training
+    training_args = TrainingArguments(
+        output_dir="./claim_detector_results",
+        eval_strategy="epoch",  # Đánh giá sau mỗi epoch
+        save_strategy="no",     # Không lưu checkpoint rác tốn dung lượng
+        learning_rate=2e-5,
+        per_device_train_batch_size=16, # An toàn cho GPU 
+        per_device_eval_batch_size=16,
+        num_train_epochs=2,     # Train 2 vòng là đủ học pattern
+        weight_decay=0.01,
+        use_cpu=not torch.cuda.is_available(),
+        report_to="none"        # Tắt wandb đỡ phiền
     )
     
-    # 4. Train
-    print("🔥 BẮT ĐẦU TRAINING CLAIM DETECTOR...")
-    train_split, eval_split = train_test_split(train_df, test_size=0.1)
-    model.train_model(train_split)
+    # D. Khởi tạo Trainer
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_datasets["train"],
+        eval_dataset=tokenized_datasets["test"],
+    )
     
-    # 5. Đánh giá
-    result, _, _ = model.eval_model(eval_split)
-    print(f"✅ Kết quả đánh giá: {result}")
-    print("💾 Model đã lưu tại: ./claim_detector_model")
+    # E. BẮT ĐẦU TRAIN
+    print("🔥 BẮT ĐẦU TRAINING (Native Transformers)...")
+    trainer.train()
+    
+    # F. Lưu Model thành phẩm
+    output_path = "./claim_detector_model"
+    print(f"💾 Đang lưu model xuống '{output_path}'...")
+    model.save_pretrained(output_path)
+    tokenizer.save_pretrained(output_path)
+    print("✅ HOÀN TẤT! Model đã sẵn sàng sử dụng.")
 
 if __name__ == "__main__":
-    # Cài thư viện nếu thiếu: pip install simpletransformers
     train_model()

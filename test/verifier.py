@@ -1,17 +1,18 @@
 import psycopg2
 import torch
 import numpy as np
-import pandas as pd
 import os
-import joblib
 import re
 from underthesea import sent_tokenize
+from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from sentence_transformers import SentenceTransformer, CrossEncoder
+from torch.nn.functional import softmax
 from dotenv import load_dotenv
 
+# Load biến môi trường
 load_dotenv()
 
+# --- CẤU HÌNH ---
 DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
@@ -20,269 +21,239 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT", "5432")
 }
 
+# Đường dẫn Model V6 (Hard Negative Specialist)
+MODEL_PATH = "my_model_v6"
+
 class AdvancedFactChecker:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"🚀 KHỞI ĐỘNG HỆ THỐNG TRÊN {self.device.upper()}...")
+        print(f"🚀 KHỞI ĐỘNG HỆ THỐNG FACT-CHECKING (V6) TRÊN {self.device.upper()}...")
 
-        # 1. LOAD CLAIM DETECTOR (PhoBERT)
-        print("   ├─ [1/4] Loading Claim Detector...")
-        claim_path = "./claim_detector_model"
-        if os.path.exists(claim_path):
-            self.claim_tokenizer = AutoTokenizer.from_pretrained(claim_path)
-            self.claim_model = AutoModelForSequenceClassification.from_pretrained(claim_path).to(self.device)
-        else:
-            print("   ⚠️ Không thấy Claim Model, sẽ dùng luật Heuristic.")
-            self.claim_model = None
-
-        # 2. LOAD RETRIEVER (Bi-Encoder)
-        print("   ├─ [2/4] Loading Retriever...")
+        # 1. RETRIEVER (Bi-Encoder)
+        print("   ├─ [1/2] Loading Retriever (Search Engine)...")
         self.retriever = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder', device=self.device)
 
-        # 3. LOAD VERIFIER (Cross-Encoder Fine-tuned)
-        print("   ├─ [3/4] Loading NLI Verifier...")
-        possible_paths = ["model/my_model_v2/final_model_saved", "my_model_v2/final_model_saved", "my_model"]
-        nli_path = next((p for p in possible_paths if os.path.exists(p)), None)
-        
-        if nli_path:
-            print(f"      -> Dùng model: {nli_path}")
-            self.verifier = CrossEncoder(nli_path, device=self.device, model_kwargs={"ignore_mismatched_sizes": True})
-        else:
-            print("      ⚠️ Dùng model gốc (kém chính xác hơn).")
-            self.verifier = CrossEncoder("cross-encoder/nli-distilroberta-base", num_labels=1, device=self.device)
+        # 2. VERIFIER (Cross-Encoder V6)
+        print(f"   ├─ [2/2] Loading Verifier V6 từ {MODEL_PATH}...")
+        try:
+            # Dùng Native Transformers để tránh lỗi Tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+            self.model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+            self.model.to(self.device)
+            self.model.eval() # Chế độ đánh giá
+            print("      ✅ Model V6 đã sẵn sàng (Native Mode)!")
+        except Exception as e:
+            print(f"      ❌ LỖI LOAD MODEL: {e}")
+            print("      💡 Gợi ý: Kiểm tra folder model xem có đủ file vocab.txt/config.json không?")
+            exit()
 
-        # 4. LOAD FINAL CLASSIFIER (XGBoost/Sklearn)
-        print("   ├─ [4/4] Loading Final Classifier...")
-        clf_path = 'final_classifier.pkl'
-        self.final_clf = joblib.load(clf_path) if os.path.exists(clf_path) else None
-            
-        print("✅ HỆ THỐNG SẴN SÀNG!\n")
-
-    def super_logic_check(self, claim, evidence):
+    def clean_text(self, text):
         """
-        Bộ lọc Logic Cứng (Hard Rules) - Phiên bản Fix lỗi 90.0 vs 9.0
-        Thứ tự ưu tiên: SỐ LIỆU > NGÀY THÁNG > TEXT OVERLAP
+        Vệ sinh văn bản đầu vào.
+        QUAN TRỌNG: Thay xuống dòng (\n) bằng dấu chấm (.) để tránh Title dính vào Body.
         """
-        c_lower = claim.lower().strip()
-        e_lower = evidence.lower().strip()
+        if not text: return ""
         
-        # --- 1. LOGIC SỐ LIỆU (NUMBER CHECK) - QUAN TRỌNG NHẤT ---
-        # Regex bắt số thực (9.0, 90.0, 1,500) và số nguyên
-        # Pattern: Số + (dấu chấm/phẩy + số) tuỳ chọn
-        num_pattern = r'\d+(?:[.,]\d+)?'
+        # 1. Ép kiểu string
+        text = str(text)
         
-        c_nums = re.findall(num_pattern, c_lower)
-        e_nums = re.findall(num_pattern, e_lower)
+        # 2. Thay xuống dòng bằng dấu chấm + cách. 
+        # (VD: "Tiêu đề\nNội dung" -> "Tiêu đề. Nội dung")
+        text = text.replace('\n', '. ').replace('\r', '. ').replace('\t', ' ')
         
-        # Hàm chuẩn hóa số (9,0 -> 9.0)
-        def parse_num(s):
-            try: return float(s.replace(',', '.'))
-            except: return None
-
-        # Danh sách số trong Evidence (đổi sang float để so sánh giá trị)
-        e_vals = [parse_num(x) for x in e_nums if parse_num(x) is not None]
+        # 3. Xóa các ký tự chấm thừa (VD: .. -> .)
+        text = re.sub(r'\.\.+', '.', text)
         
-        missing_nums = []
-        for c_str in c_nums:
-            c_val = parse_num(c_str)
-            if c_val is None: continue
-            
-            # Bỏ qua các số ngày tháng (để logic ngày tháng xử lý sau)
-            # VD: tránh bắt lỗi số 4 trong "ngày 4/1" nếu logic ngày tháng làm tốt
-            # Nhưng ở đây ta cứ check chặt.
-            
-            # Logic: Số trong Claim phải TỒN TẠI trong Evidence (sai số cực nhỏ)
-            found = False
-            for e_val in e_vals:
-                if abs(c_val - e_val) < 0.001: # Chấp nhận sai số float
-                    found = True
-                    break
-            
-            if not found:
-                missing_nums.append(c_str)
+        # 4. Xóa khoảng trắng thừa
+        text = re.sub(r'\s+', ' ', text).strip()
         
-        if missing_nums:
-            # Nếu sai số -> REFUTED ngay lập tức
-            return "REFUTED", f"Sai số liệu: Claim có {missing_nums} nhưng Evidence không có (tìm thấy {e_nums})."
-
-        # --- 2. LOGIC NGÀY THÁNG (DATE CHECK) ---
-        month_match = re.search(r'tháng (\d{1,2})', c_lower)
-        if month_match:
-            m_claim = int(month_match.group(1))
-            patterns = [
-                f"tháng {m_claim}", f"tháng {m_claim:02d}",
-                f"/{m_claim}/", f"/{m_claim:02d}/",
-                f"-{m_claim}-", f"-{m_claim:02d}-",
-                f"/{m_claim} ", f"/{m_claim:02d} ",
-                f"/{m_claim}.", f"/{m_claim:02d}.",
-                f"/{m_claim}", f"/{m_claim:02d}"
-            ]
-            has_month = any(p in e_lower for p in patterns)
-            if not has_month:
-                regex_date = fr"[\/\-]0?{m_claim}[\/\-]"
-                if not re.search(regex_date, e_lower):
-                    return "REFUTED", f"Sai tháng: Claim tháng {m_claim} nhưng Evidence không có."
-
-        # --- 3. LOGIC TRÙNG KHỚP VĂN BẢN (TEXT OVERLAP) ---
-        # Chỉ chạy khi Số liệu và Ngày tháng đã OK
-        c_clean = c_lower.replace('\n', ' ')
-        e_clean = e_lower.replace('\n', ' ')
-        
-        if e_clean in c_clean or c_clean in e_clean:
-            return "SUPPORTED", 1.0
-
-        c_tokens = set(c_clean.split())
-        e_tokens = set(e_clean.split())
-        if not c_tokens or not e_tokens: return "PASS", "No tokens"
-
-        overlap_ratio = len(c_tokens.intersection(e_tokens)) / min(len(c_tokens), len(e_tokens))
-        
-        if overlap_ratio > 0.85:
-             return "SUPPORTED", 0.95
-
-        return "PASS", "Logic OK"
+        return text
 
     def extract_claims(self, text):
-        sentences = sent_tokenize(text)
-        if not sentences: return []
+        """Tách văn bản thành các câu đơn (Claims)"""
+        # Bước 1: Clean text kỹ càng
+        cleaned_text = self.clean_text(text)
         
-        candidates = [s for s in sentences if len(s.split()) > 5]
-        final_claims = []
+        # Bước 2: Tách câu bằng Underthesea (Tách câu tiếng Việt chuẩn nhất)
+        sentences = sent_tokenize(cleaned_text)
         
-        if self.claim_model:
-            inputs = self.claim_tokenizer(candidates, padding=True, truncation=True, max_length=128, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                outputs = self.claim_model(**inputs)
-                scores = torch.nn.functional.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+        # Bước 3: Lọc câu rác
+        valid_claims = []
+        for s in sentences:
+            s = s.strip()
+            # Bỏ qua câu quá ngắn (dưới 5 từ) hoặc rác điều hướng
+            if len(s.split()) < 5: continue
             
-            for i, sent in enumerate(candidates):
-                has_digit = bool(re.search(r'\d+', sent))
-                # Lấy nếu AI tự tin hoặc có số liệu (tránh bỏ sót ngày tháng)
-                if scores[i] > 0.4 or has_digit: 
-                    final_claims.append(sent)
-        else:
-            final_claims = [s for s in candidates if any(c.isdigit() for c in s)]
+            valid_claims.append(s)
             
-        return final_claims
+        return valid_claims
+
+    def predict_pair(self, claim, evidence):
+        """
+        Dự đoán quan hệ giữa Claim và Evidence.
+        Output: List xác suất [Fake, Real, NEI]
+        """
+        # Tokenize (Tự động thêm <s> và </s> đúng chuẩn PhoBERT)
+        inputs = self.tokenizer(
+            claim, 
+            evidence, 
+            return_tensors='pt', 
+            truncation=True, 
+            max_length=256
+        ).to(self.device)
+
+        # Inference
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            probs = softmax(outputs.logits, dim=1)[0].cpu().numpy()
+        
+        # Mapping nhãn model V6: 0: REFUTED, 1: SUPPORTED, 2: NEI
+        return probs
 
     def verify(self, article_text):
-        print("="*60)
-        print("📝 BẮT ĐẦU KIỂM TRA BÀI VIẾT...")
+        print("\n" + "="*70)
+        print("📝 BẮT ĐẦU QUY TRÌNH KIỂM CHỨNG...")
+        
         claims = self.extract_claims(article_text)
-        print(f"🔍 Tìm thấy {len(claims)} câu cần kiểm chứng (Claims).")
+        print(f"🔍 Tìm thấy {len(claims)} câu cần kiểm tra (Claims).")
         
         if not claims: 
-            return {"status": "NEUTRAL", "explanation": "Không tìm thấy thông tin định lượng để kiểm chứng.", "details": []}
+            return {"status": "NEUTRAL", "explanation": "Nội dung không đủ thông tin.", "details": []}
 
-        # --- GIAI ĐOẠN 1: RETRIEVAL (TÌM KIẾM) ---
-        print("📡 Đang truy xuất bằng chứng từ Kho tri thức...")
+        # Mã hóa Claims để tìm kiếm
         claim_vectors = self.retriever.encode(claims)
+        
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
         
-        verified_details = []
+        results_list = []
         
-        for i, claim in enumerate(claims):
-            # Tìm top 5 câu gần nhất
+        for i, raw_claim in enumerate(claims):
+            claim = raw_claim # Đã clean ở bước extract
+            
+            # --- BƯỚC 1: RETRIEVAL (TÌM BẰNG CHỨNG) ---
             cur.execute("""
                 SELECT content, (embedding <=> %s::vector) as distance
                 FROM sentence_store
                 ORDER BY distance ASC
-                LIMIT 5; 
+                LIMIT 3; 
             """, (claim_vectors[i].tolist(),))
-            results = cur.fetchall()
+            rows = cur.fetchall()
             
-            # Ngưỡng 0.6 để bắt Paraphrase
-            valid_evidence = [r for r in results if r[1] < 0.60]
+            # Lọc ngưỡng: Distance < 0.65 (Nới lỏng chút vì V6 đủ khôn để lọc NEI)
+            candidates = [self.clean_text(r[0]) for r in rows if r[1] < 0.65]
             
-            if not valid_evidence:
-                verified_details.append({"claim": claim, "status": "NEI", "score": 0.5, "evidence": "Không tìm thấy dữ liệu đối chiếu."})
+            if not candidates:
+                print(f"   ⚪ Claim: {claim[:40]}... | SKIP (Không tìm thấy data gốc)")
                 continue
+
+            best_evidence = candidates[0]
+
+            # --- BƯỚC 2: VERIFICATION (MODEL V6 QUYẾT ĐỊNH) ---
+            # Không dùng Rule If/Else nữa, tin tưởng Model hoàn toàn.
+            probs = self.predict_pair(claim, best_evidence)
             
-            # Lấy câu bằng chứng tốt nhất (Distance nhỏ nhất)
-            best_evid_text = valid_evidence[0][0]
-            best_dist = valid_evidence[0][1]
+            fake_score = probs[0]
+            real_score = probs[1]
+            nei_score  = probs[2]
             
-            # --- GIAI ĐOẠN 2: VERIFICATION (LOGIC + AI) ---
+            idx = np.argmax(probs)
             
-            # A. Kiểm tra Logic Cứng
-            # Hàm logic bây giờ trả về (Status, Message/Score)
-            logic_result = self.super_logic_check(claim, best_evid_text)
-            logic_status, logic_info = self.super_logic_check(claim, best_evid_text)
-            
-            if logic_status == "REFUTED":
+            if idx == 0:   
                 status = "REFUTED"
-                final_score = 0.0  # Điểm 0 tròn trĩnh
-                print(f"   🛑 LOGIC CATCH: {logic_info}")
-            
-            elif logic_status == "SUPPORTED":
+                icon = "🛑"
+                confidence = fake_score
+            elif idx == 1: 
                 status = "SUPPORTED"
-                final_score = float(logic_info)
-            else:
-                # Logic PASS -> Dùng AI chấm
-                pairs = [[best_evid_text, claim]]
-                nli_score = float(self.verifier.predict(pairs)[0])
-                final_score = nli_score
-                
-                if final_score > 0.65: status = "SUPPORTED"
-                elif final_score < 0.35: status = "REFUTED"
-                else: status = "NEUTRAL"
-                
-                # Boost điểm nếu Logic PASS và NLI > 0.55
-                if logic_status == "PASS" and final_score > 0.55:
-                    status = "SUPPORTED"
-                    final_score = 0.85
+                icon = "✅"
+                confidence = real_score
+            else:                
+                status = "NEI"
+                icon = "⚪"
+                confidence = nei_score
+            
+            print(f"   {icon} Claim: {claim[:40]}... | {status} ({confidence:.1%})")
+            if status == "REFUTED":
+                print(f"      ➥ Gốc: {best_evidence[:60]}...")
 
-            verified_details.append({
-                "claim": claim, "status": status, "evidence": best_evid_text, "score": final_score
+            results_list.append({
+                "claim": claim, 
+                "status": status, 
+                "evidence": best_evidence, 
+                "score": float(confidence),
+                "probs": probs.tolist() # Lưu full để debug
             })
-
+            
         cur.close()
         conn.close()
 
-        # --- TỔNG HỢP KẾT QUẢ ---
-        scores = [x['score'] for x in verified_details if x['status'] != 'NEI']
-        
-        if not scores: 
-            final_status = "NEUTRAL"
-            confidence = 0.5
-            explanation = "Chưa đủ dữ liệu trong kho tri thức."
-        # Quy tắc: 1 câu sai -> Cả bài sai (Tin giả thường trộn 9 thật 1 giả)
-        elif any(x['status'] == 'REFUTED' for x in verified_details):
-            final_status = "FAKE"
-            confidence = 1.0 # Rất tự tin là Fake
-            explanation = "Hệ thống phát hiện mâu thuẫn về số liệu hoặc thời gian với dữ liệu gốc."
-        elif np.mean(scores) > 0.7:
-            final_status = "REAL"
-            confidence = np.mean(scores)
-            explanation = "Nội dung khớp với dữ liệu đã được xác thực."
-        else:
-            final_status = "NEUTRAL"
-            confidence = 0.5
-            explanation = "Thông tin chưa rõ ràng hoặc gây tranh cãi."
+        # --- BƯỚC 3: KẾT LUẬN (AGGREGATION) ---
+        return self.make_final_decision(results_list)
 
-        print("-" * 60)
-        print(f"🤖 KẾT LUẬN CUỐI CÙNG: {final_status} (Độ tin cậy: {confidence:.2%})")
-        print(f"📝 Giải thích: {explanation}")
-        print("=" * 60)
+    def make_final_decision(self, details):
+        if not details:
+            return {"status": "NEUTRAL", "confidence": 0, "explanation": "Không tìm thấy dữ liệu đối chiếu."}
+
+        refuted_items = [d for d in details if d['status'] == 'REFUTED']
+        supported_items = [d for d in details if d['status'] == 'SUPPORTED']
         
-        return {"status": final_status, "confidence": confidence, "explanation": explanation, "details": verified_details}
+        # --- RULE 1: PHÁT HIỆN TIN GIẢ (FAKE) ---
+        # Chỉ cần 1 câu bị REFUTED với độ tin cậy > 85%
+        # Model V6 đã học Hard Negative nên điểm REFUTED > 0.85 là rất đáng tin.
+        strong_fakes = [d for d in refuted_items if d['score'] > 0.85]
+        
+        if strong_fakes:
+            top = strong_fakes[0]
+            return {
+                "status": "FAKE",
+                "confidence": top['score'],
+                "explanation": f"Phát hiện sai lệch nghiêm trọng: '{top['claim']}' mâu thuẫn với dữ liệu gốc.",
+                "details": details
+            }
+
+        # --- RULE 1.5: NGHI VẤN (SUSPICIOUS) ---
+        # Trường hợp Model thấy điểm FAKE cao (>0.5) nhưng chưa thắng tuyệt đối (ví dụ NEI cao hơn xíu)
+        # Hoặc điểm FAKE áp đảo điểm REAL (gấp 3 lần)
+        for d in details:
+            p_fake = d['probs'][0]
+            p_real = d['probs'][1]
+            if p_fake > 0.5 and p_fake > (p_real * 3):
+                 return {
+                    "status": "FAKE",
+                    "confidence": p_fake,
+                    "explanation": f"Nghi vấn sai lệch số liệu/thời gian: '{d['claim']}'.",
+                    "details": details
+                }
+
+        # --- RULE 2: XÁC NHẬN TIN THẬT (REAL) ---
+        # Hơn 50% câu là SUPPORTED và KHÔNG có câu nào REFUTED
+        if len(supported_items) >= len(details) * 0.5 and not refuted_items:
+            avg_score = sum(d['score'] for d in supported_items) / len(supported_items)
+            return {
+                "status": "REAL",
+                "confidence": avg_score,
+                "explanation": "Nội dung bài viết khớp với dữ liệu đã xác thực.",
+                "details": details
+            }
+
+        # --- RULE 3: TRUNG LẬP ---
+        return {
+            "status": "NEUTRAL",
+            "confidence": 0.5,
+            "explanation": "Chưa đủ bằng chứng để kết luận (Thông tin hỗn hợp hoặc Model không chắc chắn).",
+            "details": details
+        }
 
 if __name__ == "__main__":
     checker = AdvancedFactChecker()
     
-    # --- CHẠY THỬ ---
-    print("\n>>> TEST CASE 1: Báo Giả (Nisha Patel - Sai ngày tháng)")
-    fake_news = """
-    Fadi bị bắt vì tội giết vợ vào ngày 32/2/2007. 
-    Ngày 56/5/2008, Fadi bị kết tội.
-    """
-    checker.verify(fake_news)
-
-    print("\n>>> TEST CASE 2: Báo Thật (V-League)")
-    real_news = "V-League 2024-2025 dự kiến khai mạc vào tháng 8."
-    checker.verify(real_news)
+    # Test case: Bẫy Số Liệu (Hard Negative)
+    # Giả sử trong DB có: "Việt Nam có 7 tỷ dân" (Ví dụ vui)
+    # Input sai: "Việt Nam có 70 tỷ dân"
     
-    print("\n>>> TEST CASE 3: Báo Giả (V-League sai tháng)")
-    fake_vleague = "V-League 2024-2025 dự kiến khai mạc vào tháng 12 năm nay."
-    checker.verify(fake_vleague)
+    text = "Việt Nam hiện nay có dân số khoảng 70 tỷ người."
+    print(f"\n>>> Input: {text}")
+    
+    # Lưu ý: Cần có data trong DB mới chạy được nhé
+    # result = checker.verify(text)
+    # print(f"👉 KẾT QUẢ: {result['status']}")

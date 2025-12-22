@@ -1,6 +1,6 @@
 import psycopg2
-from sentence_transformers import SentenceTransformer
 import os
+from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,62 +14,53 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT", "5432")
 }
 
-def debug_vector_search(claim_text):
-    print("\n" + "="*80)
-    print(f"🔎 TRUY VẤN (QUERY): \"{claim_text}\"")
-    print("="*80)
+def debug_retrieval():
+    print("🚀 Đang khởi động Debug Retrieval...")
     
-    # 1. Load Model Vector (Bi-Encoder)
-    # Lưu ý: Model này phải KHỚP với model bạn dùng lúc nạp DB (bkai-foundation-models/vietnamese-bi-encoder)
-    print("⏳ Đang mã hóa câu truy vấn...")
-    model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder')
-    query_vector = model.encode(claim_text)
+    # ⚠️ QUAN TRỌNG: Model này PHẢI GIỐNG HỆT model bạn dùng trong file import_to_db.py
+    model_name = 'bkai-foundation-models/vietnamese-bi-encoder'
+    print(f"   Model đang dùng: {model_name}")
+    retriever = SentenceTransformer(model_name)
     
-    # 2. Query DB
+    # Các câu query bạn đang bị lỗi
+    queries = [
+        "Thổ Nhĩ Kỳ điều 500 máy bay sơ tán công dân", # Case số liệu
+        "V-League 2024-2025 dự kiến khai mạc vào tháng 12 năm nay", # Case ngày tháng
+        "Người ngoài hành tinh đổ bộ xuống Hồ Gươm" # Case tin bịa hoàn toàn
+    ]
+    
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     
-    # Lấy top 10, hiển thị cả khoảng cách (Distance)
-    # Toán tử <=> trong pgvector là Cosine Distance
-    # Distance càng gần 0 càng giống, càng gần 1 càng khác
-    sql = """
-        SELECT content, (embedding <=> %s::vector) as distance
-        FROM sentence_store
-        ORDER BY distance ASC
-        LIMIT 10;
-    """
-    
-    cur.execute(sql, (query_vector.tolist(),))
-    results = cur.fetchall()
-    
-    print(f"{'DISTANCE':<10} | {'NỘI DUNG TÌM ĐƯỢC TRONG DB'}")
-    print("-" * 80)
-    
-    for content, dist in results:
-        # Tô màu dựa trên độ tốt của kết quả
-        mark = ""
-        if dist < 0.30: mark = "🟢 TỐT"     # Rất khớp
-        elif dist < 0.50: mark = "🟡 KHÁ"   # Khớp chủ đề/Paraphrase
-        else: mark = "🔴 KÉM"             # Không liên quan lắm
+    for query in queries:
+        print("\n" + "="*80)
+        print(f"🔎 TRUY VẤN (QUERY): \"{query}\"")
+        print("="*80)
         
-        # Cắt ngắn nội dung hiển thị
-        display_content = (content[:90] + '...') if len(content) > 90 else content
-        print(f"{dist:.4f}     | {mark} {display_content}")
+        # Mã hóa
+        print("⏳ Đang mã hóa câu truy vấn...")
+        emb = retriever.encode(query)
+        
+        # Tìm kiếm thô (Không WHERE distance, lấy thẳng top 10)
+        cur.execute("""
+            SELECT content, (embedding <=> %s::vector) as distance
+            FROM sentence_store
+            ORDER BY distance ASC
+            LIMIT 10; 
+        """, (emb.tolist(),))
+        
+        results = cur.fetchall()
+        
+        print(f"{'DISTANCE':<10} | {'NỘI DUNG TÌM ĐƯỢC TRONG DB':<80}")
+        print("-" * 95)
+        
+        for content, dist in results:
+            # Đánh giá sơ bộ
+            grade = "🟢 TỐT" if dist < 0.4 else ("🟡 KHÁ" if dist < 0.6 else "🔴 KÉM")
+            print(f"{dist:.4f}     | {grade} {content[:90]}...")
 
     cur.close()
     conn.close()
 
 if __name__ == "__main__":
-    # --- TEST CASE 1: Paraphrase (Từ đồng nghĩa) ---
-    # DB có: "Thổ Nhĩ Kỳ điều 5 phi cơ..."
-    # Query: dùng từ "máy bay", số lượng sai "500"
-    debug_vector_search("Thổ Nhĩ Kỳ điều 500 máy bay sơ tán công dân")
-
-    # --- TEST CASE 2: Sai lệch số liệu & Ngày tháng ---
-    # DB có: "V-League 2024-2025 sẽ khai mạc từ ngày 23/8..."
-    # Query: Khai mạc tháng 12
-    debug_vector_search("V-League 2024-2025 dự kiến khai mạc vào tháng 12 năm nay")
-    
-    # --- TEST CASE 3: Rất khó (Nội dung fake hoàn toàn) ---
-    # Query: Một tin bịa đặt không có trong DB
-    debug_vector_search("Người ngoài hành tinh đổ bộ xuống Hồ Gươm")
+    debug_retrieval()

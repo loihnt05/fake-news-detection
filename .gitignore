@@ -33,7 +33,10 @@ htmlcov/
 *.pth
 my_model/*
 my_model_v2/*
+my_model_v3/*
+my_model*
 cache_dir/*
 checkpoints/*
 claim_detector_model/*
 runs/*
+nli_train.json

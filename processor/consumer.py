@@ -147,8 +147,8 @@ class AIProcessor:
                 try:
                     # Lưu vector dạng list (pgvector tự hiểu)
                     cur.execute("""
-                        INSERT INTO claims (article_id, content, embedding, system_label, source_type)
-                        VALUES (%s, %s, %s, 'UNDEFINED', 'article')
+                        INSERT INTO claims (article_id, content, embedding, system_label, verified, source_type)
+                        VALUES (%s, %s, %s, 'REAL', TRUE, 'article') 
                     """, (article_id, text, emb.tolist()))
                     count += 1
                 except Exception as e:

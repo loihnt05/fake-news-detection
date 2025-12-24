@@ -21,7 +21,8 @@ TIMESTAMP_FILE = SCRAPER_DIR / ".last_scraped_at"
 
 # Biến toàn cục để lưu mốc thời gian quét (Thread-safe đơn giản)
 SHARED_STATE = {
-    "last_scraped_at": (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
+    "last_scraped_at": (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"),
+    "check_count": 0  # Đếm số lần producer quét
 }
 
 # --- 1. LUỒNG THỢ CÀO (SCRAPER WORKER) ---
@@ -41,19 +42,31 @@ def task_run_scraper():
                 cwd=str(SCRAPER_DIR),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                bufsize=1  # Line buffered
             )
             
-            # Đọc log của Scraper để biết nó đang làm gì
+            # Đọc log của Scraper với timeout để tránh bị treo
+            import select
+            article_count = 0
             while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
+                # Check if process is still running
+                if process.poll() is not None:
                     break
-                if line:
-                    # In log mờ nhạt hơn để đỡ rối mắt
-                    print(f"    (Scraper): {line.strip()}")
+                
+                # Non-blocking read với timeout
+                ready = select.select([process.stdout], [], [], 1.0)  # 1 second timeout
+                if ready[0]:
+                    line = process.stdout.readline()
+                    if line:
+                        # In log mờ nhạt hơn để đỡ rối mắt
+                        print(f"    (Scraper): {line.strip()}")
+                        article_count += 1
+                else:
+                    # Timeout - still alive, just no output
+                    continue
             
-            print("🕷️ [Thread-Scraper] Cào xong đợt này. Nghỉ 60s...")
+            print(f"🕷️ [Thread-Scraper] Cào xong đợt này ({article_count} dòng log). Nghỉ 60s...")
             time.sleep(60) 
             
         except Exception as e:
@@ -98,9 +111,14 @@ def task_run_producer():
     try:
         producer = KafkaProducer(
             bootstrap_servers=[KAFKA_SERVER],
-            value_serializer=lambda x: json.dumps(x, ensure_ascii=False).encode("utf-8")
+            value_serializer=lambda x: json.dumps(x, ensure_ascii=False).encode("utf-8"),
+            acks='all',  # Đợi acknowledge từ broker để đảm bảo ghi thành công
+            retries=3,
+            max_in_flight_requests_per_connection=1
         )
         print("✅ [Thread-Producer] Kafka Connected!")
+        print(f"   Bootstrap Server: {KAFKA_SERVER}")
+        print(f"   Topic: {KAFKA_TOPIC}")
     except Exception as e:
         print(f"❌ [Thread-Producer] Lỗi Kafka: {e}")
         return
@@ -121,23 +139,32 @@ def task_run_producer():
 
     while True:
         # Quét DB
+        SHARED_STATE["check_count"] += 1
         articles = get_new_articles_from_db(SHARED_STATE["last_scraped_at"])
         
         if articles:
             print(f"\n📦 [Thread-Producer] Tìm thấy {len(articles)} bài mới! Đang gửi...")
             
+            sent_count = 0
             for art in articles:
                 try:
-                    producer.send(KAFKA_TOPIC, art)
-                    print(f"   ✓ Sent: {art['title'][:50]}...")
+                    future = producer.send(KAFKA_TOPIC, art)
+                    # Đợi xác nhận từ Kafka
+                    record_metadata = future.get(timeout=10)
+                    sent_count += 1
+                    print(f"   ✓ Sent [{record_metadata.partition}:{record_metadata.offset}]: {art['title'][:50]}...")
                 except Exception as e:
                     print(f"   ❌ Fail: {e}")
             
             producer.flush()
+            print(f"🎉 [Thread-Producer] Đã gửi thành công {sent_count}/{len(articles)} bài!")
             
             # Cập nhật mốc thời gian ngay lập tức
             SHARED_STATE["last_scraped_at"] = articles[-1]["scraped_at"]
             print(f"📍 [Thread-Producer] Cập nhật mốc: {SHARED_STATE['last_scraped_at']}")
+        else:
+            # Hiển thị trạng thái khi không có bài mới
+            print(f"⏳ [Thread-Producer] #{SHARED_STATE['check_count']}: Không có bài mới (đang chờ từ {SHARED_STATE['last_scraped_at']})...")
         
         # Nghỉ ngắn (5s) để tạo cảm giác Real-time
         time.sleep(CHECK_INTERVAL)

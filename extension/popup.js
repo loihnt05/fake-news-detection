@@ -33,8 +33,7 @@ document.getElementById('check-btn').addEventListener('click', async () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: pageData.title,
-                    content: pageData.content
+                    text: `${pageData.title}\n\n${pageData.content}`
                 })
             });
 

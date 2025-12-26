@@ -1,67 +1,83 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('newsInput');
-    const btn = document.getElementById('checkBtn');
+document.getElementById('check-btn').addEventListener('click', async () => {
+    const statusDiv = document.getElementById('status');
     const resultBox = document.getElementById('result-box');
-    const label = document.getElementById('resLabel');
-    const msg = document.getElementById('resMsg');
-    const loader = document.getElementById('loader');
+    const btn = document.getElementById('check-btn');
+    const detailsDiv = document.getElementById('details');
 
-    // 1. Tự động lấy text đang bôi đen trên web
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        chrome.scripting.executeScript({
-            target: {tabId: tabs[0].id},
-            function: () => window.getSelection().toString()
-        }, (results) => {
-            if (results && results[0] && results[0].result) {
-                input.value = results[0].result; // Điền vào ô input
-            }
-        });
-    });
+    // Reset UI
+    statusDiv.textContent = "⏳ Đang đọc nội dung & phân tích...";
+    resultBox.style.display = 'none';
+    detailsDiv.innerHTML = '';
+    btn.disabled = true;
 
-    // 2. Xử lý khi bấm nút Kiểm tra
-    btn.addEventListener('click', async () => {
-        const text = input.value.trim();
-        if (!text) return alert("Vui lòng nhập nội dung!");
-
-        // Reset giao diện
-        btn.disabled = true;
-        loader.style.display = 'block';
-        resultBox.style.display = 'none';
+    // 1. Lấy nội dung trang web hiện tại
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: getPageContent,
+    }, async (results) => {
+        const pageData = results[0].result;
+        
+        if (!pageData) {
+            statusDiv.textContent = "❌ Không lấy được nội dung bài báo.";
+            btn.disabled = false;
+            return;
+        }
 
         try {
-            // GỌI API SERVER PYTHON
-            const response = await fetch('http://127.0.0.1:8000/check-news', {
+            // 2. Gọi API của bạn (Localhost)
+            statusDiv.textContent = "🚀 Đang gửi về AI Server...";
+            
+            const response = await fetch('http://localhost:8000/api/v1/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text })
+                body: JSON.stringify({
+                    text: `${pageData.title}\n\n${pageData.content}`
+                })
             });
 
+            if (!response.ok) throw new Error('API Error');
             const data = await response.json();
 
-            // Hiển thị kết quả
+            // 3. Hiển thị kết quả
+            statusDiv.textContent = "";
             resultBox.style.display = 'block';
-            resultBox.className = ''; // Xóa class cũ
+            resultBox.className = 'result ' + data.status.toLowerCase();
             
-            // Logic màu sắc
-            if (data.result === 'REAL') {
-                resultBox.classList.add('real');
-                label.innerText = "✅ TIN THẬT";
-            } else if (data.result === 'FAKE') {
-                resultBox.classList.add('fake');
-                label.innerText = "⚠️ TIN GIẢ";
-            } else {
-                resultBox.classList.add('undefined');
-                label.innerText = "🤔 CHƯA RÕ";
+            document.getElementById('verdict').textContent = data.status;
+            document.getElementById('confidence').textContent = `Độ tin cậy: ${(data.confidence * 100).toFixed(1)}%`;
+            
+            detailsDiv.innerHTML = `<b>📝 Giải thích:</b> ${data.explanation}<br><br>`;
+            
+            // Hiển thị chi tiết từng claim
+            if (data.details && data.details.length > 0) {
+                let html = "<b>🔎 Chi tiết kiểm chứng:</b><ul>";
+                data.details.forEach(d => {
+                    const icon = d.status === 'REFUTED' ? '❌' : (d.status === 'SUPPORTED' ? '✅' : '⚪');
+                    html += `<li style="margin-bottom: 5px;">${icon} ${d.claim}</li>`;
+                });
+                html += "</ul>";
+                detailsDiv.innerHTML += html;
             }
 
-            msg.innerText = `${data.message}\n(Độ tin cậy: ${(data.confidence * 100).toFixed(1)}%)`;
-
-        } catch (error) {
-            alert("❌ Lỗi kết nối Server! Bạn đã chạy 'uv run uvicorn main:app' chưa?");
-            console.error(error);
+        } catch (err) {
+            statusDiv.textContent = "❌ Lỗi kết nối Server: " + err.message;
         } finally {
             btn.disabled = false;
-            loader.style.display = 'none';
         }
     });
 });
+
+// Hàm này sẽ chạy trực tiếp trên trang web (Content Script)
+function getPageContent() {
+    // Logic lấy tin riêng cho VnExpress (hoặc các trang báo chung)
+    const title = document.querySelector('h1.title-detail')?.innerText || document.title;
+    const content = document.querySelector('article.fck_detail')?.innerText || document.body.innerText;
+    
+    // Cắt bớt nội dung nếu quá dài để gửi API cho nhanh (Model cũng chỉ cần đoạn đầu)
+    return {
+        title: title,
+        content: content.substring(0, 3000) // Lấy 3000 ký tự đầu
+    };
+}

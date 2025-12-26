@@ -40,3 +40,4 @@ checkpoints/*
 claim_detector_model/*
 runs/*
 nli_train.json
+phobert*

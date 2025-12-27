@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "VN Fake News Detector",
-  "version": "1.0",
-  "description": "AI Fact-Checking Extension for VnExpress",
-  "permissions": ["activeTab", "scripting"],
+  "name": "VN Fact-Check AI",
+  "version": "2.0",
+  "description": "Phát hiện tin giả bằng AI PhoBERT",
+  "permissions": ["activeTab", "scripting", "storage"], 
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

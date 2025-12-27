@@ -3,30 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { width: 320px; font-family: sans-serif; padding: 10px; }
-        h3 { margin-top: 0; color: #333; }
-        .result { padding: 15px; border-radius: 8px; margin-top: 10px; text-align: center; display: none; }
-        .loading { color: #666; font-style: italic; }
-        .fake { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        body { width: 350px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; background-color: #f9f9f9; }
+        h3 { margin: 0 0 10px 0; color: #333; font-size: 16px; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        
+        .status-box { padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 10px; display: none; }
         .real { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .fake { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
         .neutral { background-color: #f5f5f5; color: #616161; border: 1px solid #e0e0e0; }
-        button { width: 100%; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #1976D2; }
-        #details { font-size: 12px; margin-top: 10px; text-align: left; }
+
+        .btn-check { width: 100%; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.3s; }
+        .btn-check:hover { background: #1976D2; }
+        .btn-check:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Style cho danh sách Claims */
+        ul { list-style-type: none; padding: 0; margin: 0; }
+        li { background: white; border: 1px solid #eee; margin-bottom: 8px; padding: 8px; border-radius: 4px; font-size: 12px; }
+        .claim-text { display: block; margin-bottom: 5px; color: #333; }
+        
+        /* Nút Report nhỏ */
+        .actions { display: flex; gap: 5px; justify-content: flex-end; margin-top: 5px; }
+        .btn-report { padding: 4px 8px; border: none; border-radius: 3px; font-size: 10px; cursor: pointer; opacity: 0.8; }
+        .btn-report:hover { opacity: 1; }
+        .rep-fake { background: #ffebee; color: #d32f2f; border: 1px solid #ffcdd2; }
+        .rep-real { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+
+        .loading { font-style: italic; color: #666; font-size: 12px; text-align: center; margin: 10px 0; }
+        .footer { font-size: 10px; color: #999; text-align: center; margin-top: 15px; }
     </style>
 </head>
 <body>
-    <h3>🕵️ Fact Checker AI</h3>
-    <div id="status" class="loading">Sẵn sàng kiểm tra...</div>
+    <h3>🕵️ AI Fact-Checker V2</h3>
     
-    <div id="result-box" class="result">
-        <h2 id="verdict" style="margin: 0;"></h2>
-        <p id="confidence"></p>
-    </div>
-    
-    <div id="details"></div>
+    <div id="status-msg" class="loading">Sẵn sàng phân tích tin tức...</div>
 
-    <button id="check-btn">🔍 Kiểm tra trang này</button>
+    <div id="main-result" class="status-box">
+        <h2 id="verdict" style="margin: 0; font-size: 20px;"></h2>
+        <div id="confidence" style="font-size: 12px;"></div>
+        <div id="explanation" style="font-size: 11px; margin-top: 5px; font-style: italic;"></div>
+    </div>
+
+    <div id="claims-list"></div>
+
+    <button id="check-btn" class="btn-check">🔍 Kiểm tra trang này</button>
+    
+    <div class="footer">Powered by PhoBERT V7 Robust</div>
 
     <script src="popup.js"></script>
 </body>

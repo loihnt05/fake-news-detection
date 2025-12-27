@@ -19,8 +19,8 @@ DB_CONFIG = {
 }
 
 # ĐỊNH DANH PHIÊN BẢN MODEL (Cực quan trọng cho Traceability)
-CURRENT_MODEL_VERSION = "v6_hard_negative_2025_01"
-MODEL_PATH = "my_model_v6" 
+CURRENT_MODEL_VERSION = "v7_hard_negative_2025_01"
+MODEL_PATH = "my_model_v7" 
 
 class AdvancedFactChecker:
     def __init__(self):

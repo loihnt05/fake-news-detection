@@ -1,6 +1,4 @@
-version: '3'
-
-# Định nghĩa cấu hình chung cho Airflow
+# --- CẤU HÌNH CHUNG AIRFLOW ---
 x-airflow-common:
   &airflow-common
   build:
@@ -9,16 +7,17 @@ x-airflow-common:
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/airflow
-    AIRFLOW__CORE__FERNET_KEY: FB0o_zt4e3ZkkFSIV59lzf_cld7j6O-0
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/airflow
+    AIRFLOW__CORE__FERNET_KEY: 'jHKoIJ8YzUGOlr5BqcRRWs8KJ5n9N_ZQxcI8D1qVfLg='
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    # Quan trọng: Thêm đường dẫn project vào PYTHONPATH để Airflow import được module 'model', 'processor'
+    PYTHONPATH: "/opt/project:/opt/airflow"
   volumes:
     - ./dags:/opt/airflow/dags
-    - ./scripts:/opt/airflow/scripts
-    - ./data:/opt/airflow/data
     - ./logs:/opt/airflow/logs
-    - ./pyproject.toml:/opt/airflow/pyproject.toml
+    # Mount toàn bộ code dự án vào để Airflow chạy script retrain
+    - .:/opt/project
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     db:
@@ -27,9 +26,13 @@ x-airflow-common:
       condition: service_started
 
 services:
-  # --- SERVICE 1: DATABASE ---
+  # =========================================
+  # 1. INFRASTRUCTURE (DB & MESSAGE QUEUE)
+  # =========================================
   db:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile # Dockerfile Postgres vector của bạn
     container_name: my_postgres_vector
     restart: always
     environment:
@@ -47,7 +50,6 @@ services:
       retries: 5
       start_period: 5s
 
-  # --- SERVICE 2: PGADMIN ---
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: my_pgadmin
@@ -62,7 +64,6 @@ services:
     depends_on:
       - db
 
-  # --- SERVICE 3: KAFKA & ZOOKEEPER ---
   zookeeper:
     image: wurstmeister/zookeeper:latest
     ports:
@@ -75,7 +76,6 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # Cấu hình để kết nối được từ cả bên trong Docker và bên ngoài (Localhost)
       KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://localhost:9092
       KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
@@ -88,7 +88,6 @@ services:
     depends_on:
       - zookeeper
 
-  # Giao diện quản lý Kafka (MỚI THÊM) -> Truy cập localhost:8888
   kafka-ui:
     image: provectuslabs/kafka-ui
     ports:
@@ -100,7 +99,92 @@ services:
     depends_on:
       - kafka
 
-  # --- SERVICE 4: AIRFLOW ---
+  # =========================================
+  # 2. APPLICATION SERVICES (APP CỦA BẠN)
+  # =========================================
+  
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: factcheck_backend
+    # Lệnh chạy server, reload khi code thay đổi (dev mode)
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app # Mount code để Hot-Reload
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - KAFKA_SERVER=kafka:9093
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # Kafka Consumer (AI Processor) - Chạy liên tục xử lý tin nhắn
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: factcheck_consumer
+    command: python processor/consumer.py
+    volumes:
+      - .:/app
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - KAFKA_SERVER=kafka:9093
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
+  # Admin Dashboard (Streamlit)
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: factcheck_dashboard
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - db
+      - backend
+
+  # =========================================
+  # 3. WORKFLOW ORCHESTRATION (AIRFLOW)
+  # =========================================
+
+  # Service khởi tạo Airflow (Chạy 1 lần rồi tắt)
+  airflow-init:
+    <<: *airflow-common
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin}
+    command: bash -c "airflow db init && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
+
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -111,10 +195,16 @@ services:
       interval: 30s
       timeout: 30s
       retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
 
   airflow-scheduler:
     <<: *airflow-common
-    command: bash -c "uv pip compile /opt/airflow/pyproject.toml -o requirements.txt && pip install -r requirements.txt && airflow db init && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin && airflow scheduler"
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
 
 volumes:
   vnexpress_data_new:

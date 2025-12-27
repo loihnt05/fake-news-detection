@@ -72,19 +72,27 @@ document.getElementById('check-btn').addEventListener('click', async () => {
                 
                 data.details.forEach(item => {
                     const icon = item.status === 'REFUTED' ? '❌' : (item.status === 'SUPPORTED' ? '✅' : '⚪');
-                    const claimId = item.claim_id || "null"; // ID để report
+                    const claimId = item.claim_id || "null"; 
                     
-                    // Tạo HTML cho từng dòng claim
+                    // --- SỬA CHỖ NÀY: Dùng data-attribute thay vì onclick ---
                     const li = document.createElement('li');
                     li.innerHTML = `
                         <span class="claim-text">${icon} ${item.claim}</span>
                         <div class="actions">
                             <button class="btn-report rep-fake" 
-                                onclick="reportClaim('${claimId}', 'FAKE', '${item.status}', ${item.score}, '${data.model_version}')">
+                                data-id="${claimId}" 
+                                data-feedback="FAKE"
+                                data-ailabel="${item.status}"
+                                data-aiconf="${item.score}"
+                                data-modelver="${data.model_version}">
                                 🚨 Báo sai
                             </button>
                             <button class="btn-report rep-real"
-                                onclick="reportClaim('${claimId}', 'REAL', '${item.status}', ${item.score}, '${data.model_version}')">
+                                data-id="${claimId}" 
+                                data-feedback="REAL"
+                                data-ailabel="${item.status}"
+                                data-aiconf="${item.score}"
+                                data-modelver="${data.model_version}">
                                 👍 Xác nhận đúng
                             </button>
                         </div>
@@ -92,6 +100,9 @@ document.getElementById('check-btn').addEventListener('click', async () => {
                     claimsDiv.appendChild(li);
                 });
                 claimsDiv.innerHTML += "</ul>";
+
+                // --- GẮN SỰ KIỆN CLICK SAU KHI TẠO HTML ---
+                addReportListeners();
             }
 
         } catch (err) {
@@ -103,16 +114,37 @@ document.getElementById('check-btn').addEventListener('click', async () => {
     });
 });
 
-// 3. HÀM GỬI BÁO CÁO (REPORT)
-// Hàm này phải gắn vào window để gọi được từ onclick trong HTML string
-window.reportClaim = async (claimId, feedback, aiLabel, aiConf, modelVer) => {
+// 3. HÀM GẮN SỰ KIỆN CLICK (Thay thế cho onclick)
+function addReportListeners() {
+    const buttons = document.querySelectorAll('.btn-report');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            // Lấy dữ liệu từ data-attribute
+            const target = e.currentTarget; // Nút được bấm
+            const claimId = target.dataset.id;
+            const feedback = target.dataset.feedback;
+            const aiLabel = target.dataset.ailabel;
+            const aiConf = target.dataset.aiconf;
+            const modelVer = target.dataset.modelver;
+
+            await handleReport(target, claimId, feedback, aiLabel, aiConf, modelVer);
+        });
+    });
+}
+
+// 4. LOGIC GỬI REPORT
+async function handleReport(btnElement, claimId, feedback, aiLabel, aiConf, modelVer) {
     if (claimId === "null" || !claimId) {
         alert("⚠️ Câu này chưa có trong Database (Claim ID = null) nên không thể báo cáo.\n\nHãy chạy lại script rebuild_kb.py để nạp dữ liệu chuẩn.");
         return;
     }
 
     const userId = await getOrCreateUserId();
-    const comment = prompt("Bạn có muốn ghi chú gì thêm không? (Không bắt buộc)");
+    
+    // Hiệu ứng loading
+    const originalText = btnElement.textContent;
+    btnElement.textContent = "⏳...";
+    btnElement.disabled = true;
 
     try {
         const response = await fetch(`${API_URL}/report`, {
@@ -121,31 +153,33 @@ window.reportClaim = async (claimId, feedback, aiLabel, aiConf, modelVer) => {
             body: JSON.stringify({
                 user_id: userId,
                 claim_id: parseInt(claimId),
-                feedback: feedback, // 'FAKE' hoặc 'REAL' (Ý kiến user)
-                comment: comment || "",
+                feedback: feedback, 
+                comment: "Reported via Extension V2",
                 ai_label: aiLabel,
-                ai_confidence: aiConf,
+                ai_confidence: parseFloat(aiConf),
                 model_version: modelVer
             })
         });
 
         if (response.ok) {
-            alert("✅ Cảm ơn! Báo cáo của bạn đã được gửi tới Admin.");
+            alert("✅ Đã gửi báo cáo thành công!");
+            btnElement.textContent = "Đã gửi";
         } else {
-            alert("❌ Lỗi gửi báo cáo.");
+            alert("❌ Lỗi Server.");
+            btnElement.textContent = originalText;
+            btnElement.disabled = false;
         }
     } catch (e) {
         alert("❌ Lỗi kết nối: " + e.message);
+        btnElement.textContent = originalText;
+        btnElement.disabled = false;
     }
 };
 
-// 4. CONTENT SCRIPT (Chạy trên trang web)
+// 5. CONTENT SCRIPT
 function getPageContent() {
-    // Lấy tiêu đề và nội dung bài báo (VnExpress & General)
     const title = document.querySelector('h1.title-detail')?.innerText || document.title;
     const content = document.querySelector('article.fck_detail')?.innerText || document.body.innerText;
-    
-    // Cắt gọn bớt để gửi cho nhanh
     const fullText = title + ". " + content;
     return fullText.substring(0, 4000); 
 }

@@ -15,8 +15,8 @@ DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", "admin"),
-    "host": "localhost",
-    "port": "5432"
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
 }
 
 # ĐƯỜNG DẪN MODEL MỚI (Theo cấu trúc project hiện tại)

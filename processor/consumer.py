@@ -15,7 +15,7 @@ load_dotenv()
 
 # --- CẤU HÌNH ---
 KAFKA_TOPIC = "raw_articles"
-KAFKA_SERVER = "localhost:9092"
+KAFKA_SERVER = os.getenv("KAFKA_SERVER", "localhost:9092")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32 # Tối ưu tốc độ xử lý hàng loạt
 
@@ -24,8 +24,8 @@ DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", "admin"),
-    "host": "localhost",
-    "port": "5432"
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
 }
 
 MODEL_EXTRACTOR_PATH = "model/phobert_claim_extractor"

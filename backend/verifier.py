@@ -14,13 +14,13 @@ DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", "admin"),
-    "host": "localhost",
-    "port": "5432"
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
 }
 
 # ĐỊNH DANH PHIÊN BẢN MODEL (Cực quan trọng cho Traceability)
-CURRENT_MODEL_VERSION = "v6_hard_negative_2025_01"
-MODEL_PATH = "my_model_v6" 
+CURRENT_MODEL_VERSION = "v7_hard_negative_2025_01"
+MODEL_PATH = "my_model_v7" 
 
 class AdvancedFactChecker:
     def __init__(self):

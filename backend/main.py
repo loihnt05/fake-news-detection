@@ -7,15 +7,15 @@ from pydantic import BaseModel
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-from verifier import AdvancedFactChecker
+from backend.verifier import AdvancedFactChecker
 
 # --- DB CONFIG ---
 DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", "admin"),
-    "host": "localhost",
-    "port": "5432"
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
 }
 
 checker_instance = None
@@ -161,6 +161,24 @@ def approve_report(req: ApprovalRequest):
         return {"message": f"Report {req.verdict}. User reputation updated."}
     except Exception as e:
         raise HTTPException(500, str(e))
+    
+# API nội bộ để Airflow gọi khi Retrain xong
+@app.post("/api/internal/reload-model")
+def trigger_reload_model(secret_key: str):
+    # Bảo mật đơn giản để người ngoài không gọi bừa
+    if secret_key != "SUPER_SECRET_AIRFLOW_KEY": 
+        raise HTTPException(403, "Forbidden")
+    
+    # Giả sử quy trình retrain luôn lưu model vào thư mục 'latest' hoặc theo version
+    # Ở đây ta load model mới nhất vừa train xong
+    NEW_MODEL_PATH = "model/phobert_v8_finetuned" 
+    
+    if checker_instance:
+        success = checker_instance.reload_model(NEW_MODEL_PATH)
+        if success:
+            return {"status": "success", "message": "Model reloaded successfully"}
+    
+    raise HTTPException(500, "Failed to reload model")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

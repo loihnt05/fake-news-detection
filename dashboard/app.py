@@ -15,13 +15,14 @@ st.set_page_config(page_title="Fact-Check Admin", layout="wide", page_icon="🛡
 
 DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
-    "user": os.getenv("POSTGRES_USER", "vnexpress"),
-    "password": os.getenv("POSTGRES_PASSWORD", "admin123"),
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": os.getenv("DB_PORT", "5432")
+    "user": os.getenv("POSTGRES_USER", "admin"),
+    "password": os.getenv("POSTGRES_PASSWORD", "admin"),
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
 }
 
-API_URL = "http://localhost:8000/api/v1"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+API_URL = f"{BACKEND_URL}/api/v1"
 
 # --- HELPER FUNCTIONS ---
 def get_db_connection():

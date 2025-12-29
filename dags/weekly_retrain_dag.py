@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.providers.http.operators.http import HttpOperator
 from datetime import datetime, timedelta
+import os
 
 default_args = {
     'owner': 'admin',
@@ -24,27 +24,16 @@ with DAG(
         bash_command='cd /opt/project && python model/retrain_pipeline.py',
         env={
             'POSTGRES_HOST': 'db',
-            'POSTGRES_USER': '{{ var.value.POSTGRES_USER }}',
-            'POSTGRES_PASSWORD': '{{ var.value.POSTGRES_PASSWORD }}',
-            'POSTGRES_DB': '{{ var.value.POSTGRES_DB }}',
+            'POSTGRES_USER': os.getenv('POSTGRES_USER', 'postgres'),
+            'POSTGRES_PASSWORD': os.getenv('POSTGRES_PASSWORD', 'postgres'),
+            'POSTGRES_DB': os.getenv('POSTGRES_DB', 'fake_news_db'),
         }
     )
 
-    # Task 2: Gọi API Backend để reload model (Webhook)
-    # Cần tạo HTTP Connection trong Airflow UI trước:
-    # Admin -> Connections -> Add -> 
-    #   Conn Id: backend_api_connection
-    #   Host: backend
-    #   Port: 8000
-    #   Schema: http
-    reload_api_task = HttpOperator(
+    # Task 2: Gọi API Backend để reload model
+    reload_api_task = BashOperator(
         task_id='trigger_backend_reload',
-        http_conn_id='backend_api_connection',
-        endpoint='/api/internal/reload-model?secret_key=SUPER_SECRET_AIRFLOW_KEY',
-        method='POST',
-        headers={"Content-Type": "application/json"},
+        bash_command='curl -X POST "http://backend:8000/api/internal/reload-model?secret_key=SUPER_SECRET_AIRFLOW_KEY" -H "Content-Type: application/json" || true',
     )
-
-    train_task >> reload_api_task
 
     train_task >> reload_api_task

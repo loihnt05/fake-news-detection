@@ -264,7 +264,8 @@ class RetrainPipeline:
             
             if len(train_data) < MIN_TRAINING_SAMPLES:
                 print(f"\n⏭️ Bỏ qua training: Chưa đủ {MIN_TRAINING_SAMPLES} samples")
-                return False
+                print("   (Đây là trạng thái bình thường, không phải lỗi)")
+                return True  # Success - không cần retrain
                 
             # 4. Train model
             print("\n📋 Bước 3: Training model...")

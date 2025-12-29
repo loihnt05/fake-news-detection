@@ -13,6 +13,11 @@ x-airflow-common:
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     # Quan trọng: Thêm đường dẫn project vào PYTHONPATH để Airflow import được module 'model', 'processor'
     PYTHONPATH: "/opt/project:/opt/airflow"
+    # Database credentials for retrain scripts
+    POSTGRES_HOST: db
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs

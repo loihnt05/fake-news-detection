@@ -72,7 +72,7 @@ CREATE INDEX IF NOT EXISTS claims_embedding_idx
 -- 4. USERS TABLE (Người dùng Extension)
 -- =============================================
 CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,  -- UUID từ Extension
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     role TEXT DEFAULT 'USER' CHECK (role IN ('USER', 'MODERATOR', 'ADMIN')),
     reputation_score FLOAT DEFAULT 0.5 CHECK (reputation_score >= 0 AND reputation_score <= 1),
     total_reports INTEGER DEFAULT 0,
@@ -86,9 +86,9 @@ CREATE TABLE IF NOT EXISTS users (
 -- 5. USER_REPORTS TABLE (Feedback từ user)
 -- =============================================
 CREATE TABLE IF NOT EXISTS user_reports (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     claim_id INTEGER REFERENCES claims(id) ON DELETE CASCADE,
-    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     
     -- Feedback từ User
     user_feedback TEXT NOT NULL CHECK (user_feedback IN ('REAL', 'FAKE', 'UNSURE')),
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS training_data (
     label TEXT NOT NULL CHECK (label IN ('ENTAILMENT', 'CONTRADICTION', 'NEUTRAL')),
     
     source TEXT DEFAULT 'user_feedback',  -- 'user_feedback', 'admin', 'manual'
-    report_id INTEGER REFERENCES user_reports(id),
+    report_id UUID REFERENCES user_reports(id),
     
     used_in_version TEXT,  -- Đã dùng train version nào
     created_at TIMESTAMP DEFAULT NOW()

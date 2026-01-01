@@ -17,12 +17,18 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    # Task 1: Chạy Crawler (Go binary hoặc Python scraper)
-    # Nếu dùng Go binary: ./scraper-db
-    # Nếu dùng Python scraper: python crawler/producer.py --mode=batch
+    # Task 1: Chạy Crawler (Batch mode)
+    # Uses batch_crawler.py which:
+    # 1. Connects to Kafka using the correct Docker service name
+    # 2. Sends test articles to verify connectivity
+    # 3. Runs the scraper script
     crawl_task = BashOperator(
         task_id='run_crawler',
-        bash_command='cd /opt/project && python crawler/producer.py --mode=batch || echo "Crawler finished or not available"',
+        bash_command='cd /opt/project && python crawler/batch_crawler.py',
+        env={
+            'KAFKA_SERVER': 'kafka:9093',  # Use Docker service name, not localhost
+            'PYTHONPATH': '/opt/project',
+        },
     )
 
     # Task 2: Rebuild Knowledge Base sau khi crawl xong

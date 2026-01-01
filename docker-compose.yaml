@@ -23,6 +23,8 @@ x-airflow-common:
     - ./logs:/opt/airflow/logs
     # Mount toàn bộ code dự án vào để Airflow chạy script retrain
     - .:/opt/project
+    # Mount scraper directory to access scraped articles database
+    - ../scrape-vnexpress:/opt/scrape-vnexpress:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     db:

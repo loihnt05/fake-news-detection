@@ -31,9 +31,11 @@ app = FastAPI(title="Fact-Check API Pro", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r".*",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # --- SCHEMAS (Chuẩn Production) ---
@@ -54,6 +56,7 @@ class VerificationResult(BaseModel):
 
 class NewsRequest(BaseModel):
     text: str
+    url: Optional[str] = None  # Add URL to enable instant domain blocking
 
 # Schema cho Report (Context đầy đủ)
 class UserReportRequest(BaseModel):
@@ -73,7 +76,7 @@ class UserReportRequest(BaseModel):
 @app.post("/api/v1/verify", response_model=VerificationResult)
 def verify_news(request: NewsRequest):
     if not checker_instance: raise HTTPException(503, "Loading...")
-    return checker_instance.verify(request.text)
+    return checker_instance.verify(request.text, request.url)
 
 @app.post("/api/v1/report")
 def report_news(req: UserReportRequest):
@@ -114,32 +117,35 @@ class ApprovalRequest(BaseModel):
     report_id: str
     verdict: str # APPROVED / REJECTED
 
+# Trong backend/main.py
+
 @app.post("/api/v1/admin/approve-report")
 def approve_report(req: ApprovalRequest):
-    """
-    Hàm này sẽ được gọi từ Admin Dashboard.
-    Khi Admin bấm DUYỆT -> Cập nhật Reputation cho User.
-    """
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         with conn.cursor() as cur:
-            # 1. Update trạng thái Report
+            # 1. Lấy thông tin report trước khi update
+            cur.execute("""
+                SELECT user_id, claim_id, user_feedback 
+                FROM user_reports WHERE id = %s
+            """, (req.report_id,))
+            report_data = cur.fetchone()
+            
+            if not report_data:
+                raise HTTPException(404, "Report not found")
+            
+            user_id, claim_id, feedback = report_data
+
+            # 2. Update trạng thái Report (PENDING -> APPROVED/REJECTED)
             cur.execute("""
                 UPDATE user_reports 
                 SET status = %s, reviewed_at = NOW()
                 WHERE id = %s
-                RETURNING user_id;
             """, (req.verdict, req.report_id))
-            
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(404, "Report not found")
-            
-            user_id = row[0]
 
-            # 2. UPDATE REPUTATION (Logic thưởng phạt)
+            # 3. LOGIC XỬ LÝ KHI DUYỆT (APPROVED)
             if req.verdict == 'APPROVED':
-                # Tăng uy tín (+0.1, max 1.0)
+                # A. Cộng điểm uy tín cho User (Code cũ)
                 cur.execute("""
                     UPDATE users 
                     SET reputation_score = LEAST(reputation_score + 0.1, 1.0),
@@ -147,8 +153,21 @@ def approve_report(req: ApprovalRequest):
                         total_reports = total_reports + 1
                     WHERE id = %s
                 """, (user_id,))
+                
+                # 🔥 B. [MỚI] NẠP VÀO BLACKLIST NGAY LẬP TỨC
+                # Nếu User báo FAKE và Admin Duyệt -> Biến Claim đó thành 'Known Fake'
+                if feedback == 'FAKE':
+                    print(f"🚨 ALERT: Đưa Claim {claim_id} vào Blacklist (FAKE)")
+                    cur.execute("""
+                        UPDATE claims 
+                        SET system_label = 'FAKE', 
+                            verified = TRUE,
+                            trust_score = 0.0
+                        WHERE id = %s
+                    """, (claim_id,))
+                    
             elif req.verdict == 'REJECTED':
-                # Giảm uy tín (-0.05, min 0.0)
+                # Trừ điểm (Code cũ)
                 cur.execute("""
                     UPDATE users 
                     SET reputation_score = GREATEST(reputation_score - 0.05, 0.0),
@@ -158,8 +177,9 @@ def approve_report(req: ApprovalRequest):
                 
         conn.commit()
         conn.close()
-        return {"message": f"Report {req.verdict}. User reputation updated."}
+        return {"message": f"Processed {req.verdict}. System memory updated."}
     except Exception as e:
+        print(e)
         raise HTTPException(500, str(e))
     
 # API nội bộ để Airflow gọi khi Retrain xong

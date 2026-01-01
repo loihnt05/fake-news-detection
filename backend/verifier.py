@@ -8,6 +8,9 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 from difflib import SequenceMatcher
 from dotenv import load_dotenv
 
+# Import Instant Filter for immediate blocking
+from backend.instant_filter import InstantFakeNewsFilter
+
 load_dotenv()
 
 # --- CẤU HÌNH ---
@@ -15,19 +18,23 @@ DB_CONFIG = {
     "dbname": os.getenv("POSTGRES_DB", "vnexpress_scraper"),
     "user": os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", "admin"),
-    "host": "localhost",
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": "5432"
 }
 
 # Load Model
-MODEL_PATH = "model/phobert_v7_robust"  # Dùng bản mới nhất
+MODEL_PATH = "my_model_v7"  # Dùng bản mới nhất
 CURRENT_MODEL_VERSION = "v7_robust_dual_branch"
 
 class AdvancedFactChecker:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"🚀 [Verifier {CURRENT_MODEL_VERSION}] KHỞI ĐỘNG...")
-        print(f"   🔥 Mode: Dual-Layer (Memory Check + Evidence Check)")
+        print(f"   🔥 Mode: Triple-Layer (Instant Filter + Memory Check + Evidence Check)")
+
+        # LAYER 0: Instant Filter (No AI needed - Pattern matching)
+        print("   ├─ Loading Instant Filter (Pattern-Based Blocking)...")
+        self.instant_filter = InstantFakeNewsFilter()
 
         print("   ├─ Loading Retriever (Bi-Encoder)...")
         self.retriever = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder', device=self.device)
@@ -51,7 +58,35 @@ class AdvancedFactChecker:
         # Lọc câu quá ngắn
         return [s.strip() for s in sentences if len(s.split()) > 5]
 
-    def verify(self, article_text):
+    def verify(self, article_text, url=None):
+        # ============================================================
+        # 🚨 LAYER 0: INSTANT BLOCKING (No AI needed - milliseconds)
+        # Check for known fake news patterns FIRST
+        # ============================================================
+        instant_result = self.instant_filter.check(article_text, url)
+        
+        if instant_result["should_block"]:
+            print(f"   🚫 INSTANT BLOCK - Severity: {instant_result['severity']}")
+            print(f"   📊 Suspicion Score: {instant_result['suspicion_score']:.2%}")
+            
+            return {
+                "status": "FAKE",
+                "confidence": min(0.95, 0.70 + instant_result['suspicion_score'] * 0.25),
+                "explanation": self.instant_filter.get_warning_message(instant_result),
+                "model_version": f"{CURRENT_MODEL_VERSION}_INSTANT_FILTER",
+                "instant_block": True,
+                "instant_reasons": instant_result["reasons"],
+                "matched_patterns": [p["type"] for p in instant_result["matched_patterns"]],
+                "details": [{
+                    "claim_id": None,
+                    "claim": "⚠️ NỘI DUNG BỊ CHẶN TỰ ĐỘNG",
+                    "status": "REFUTED",
+                    "score": instant_result['suspicion_score'],
+                    "evidence": instant_result['reasons'][0] if instant_result['reasons'] else "Phát hiện nội dung nguy hiểm"
+                }]
+            }
+        
+        # If passed instant filter, continue with normal AI verification
         claims = self.extract_claims(article_text)
         if not claims: 
             return {

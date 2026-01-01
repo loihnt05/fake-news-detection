@@ -47,11 +47,14 @@ document.getElementById('check-btn').addEventListener('click', async () => {
         const pageText = results[0].result;
 
         try {
-            // GỌI API VERIFY
+            // GỌI API VERIFY (with URL for instant domain checking)
             const response = await fetch(`${API_URL}/verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: pageText })
+                body: JSON.stringify({ 
+                    text: pageText,
+                    url: tab.url  // Pass URL for instant blocking
+                })
             });
 
             if (!response.ok) throw new Error('API Error');
@@ -62,7 +65,16 @@ document.getElementById('check-btn').addEventListener('click', async () => {
             resultBox.style.display = 'block';
             resultBox.className = 'status-box ' + data.status.toLowerCase();
             
-            document.getElementById('verdict').textContent = data.status === 'FAKE' ? "CẢNH BÁO: TIN GIẢ" : (data.status === 'REAL' ? "TIN CHÍNH XÁC" : "CHƯA XÁC THỰC");
+            // Check if it was instantly blocked
+            let verdictText = "";
+            if (data.instant_block) {
+                verdictText = "🚫 CHẶN NGAY LẬP TỨC - TIN GIẢ NGUY HIỂM";
+                resultBox.classList.add('instant-block');
+            } else {
+                verdictText = data.status === 'FAKE' ? "CẢNH BÁO: TIN GIẢ" : (data.status === 'REAL' ? "TIN CHÍNH XÁC" : "CHƯA XÁC THỰC");
+            }
+            
+            document.getElementById('verdict').textContent = verdictText;
             document.getElementById('confidence').textContent = `Độ tin cậy: ${(data.confidence * 100).toFixed(1)}% | Model: ${data.model_version}`;
             document.getElementById('explanation').textContent = data.explanation;
 
